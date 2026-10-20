@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { CasePractice } from './CasePractice'
+import { StepPractice } from './StepPractice'
 
 type Mode = 'case' | 'step'
 
@@ -21,7 +22,7 @@ export function PracticePage() {
         </button>
       </div>
       {mode === 'case' && <CasePractice />}
-      {mode === 'step' && <p className="muted">ステップ練習は次のフェーズで実装します。</p>}
+      {mode === 'step' && <StepPractice />}
     </div>
   )
 }
