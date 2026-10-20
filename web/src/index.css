@@ -698,3 +698,47 @@ button.on-accent {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+.mode-tabs {
+  margin-bottom: 12px;
+}
+
+.case-group h3 {
+  margin: 16px 0 8px;
+}
+
+.case-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.case-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  opacity: 0.55;
+}
+
+.case-card.selected {
+  opacity: 1;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.case-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.case-stat {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.last-case .alg {
+  margin-top: 2px;
+}

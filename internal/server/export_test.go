@@ -107,3 +107,17 @@ func TestSettingsAPI(t *testing.T) {
 		t.Fatalf("persisted settings: %s", rec.Body)
 	}
 }
+
+func TestCasesAPI(t *testing.T) {
+	h := newTestServer(t, t.TempDir())
+	var all []Case
+	json.Unmarshal(do(t, h, http.MethodGet, "/api/cases", "").Body.Bytes(), &all)
+	if len(all) != 57+21+41 {
+		t.Fatalf("cases: %d", len(all))
+	}
+	var pll []Case
+	json.Unmarshal(do(t, h, http.MethodGet, "/api/cases?set=PLL", "").Body.Bytes(), &pll)
+	if len(pll) != 21 || pll[0].Set != "PLL" || len(pll[0].Pattern) != 54 || pll[0].Alg == "" {
+		t.Fatalf("pll: %+v", pll)
+	}
+}

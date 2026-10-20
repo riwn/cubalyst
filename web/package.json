@@ -9,7 +9,9 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run src",
+    "gen:cases": "GEN_CASES=1 vitest run scripts/gen-cases.test.ts",
+    "gen:f2l": "GEN_F2L=1 vitest run scripts/gen-f2l.test.ts"
   },
   "dependencies": {
     "cubing": "^0.66.1",

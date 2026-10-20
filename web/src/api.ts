@@ -138,3 +138,17 @@ export type ImportResult = { imported: number; skipped: number; errors: string[]
 export async function importSolves(json: string): Promise<ImportResult> {
   return request('/api/import', { method: 'POST', body: json, headers: { 'Content-Type': 'application/json' } })
 }
+
+export type CaseInfo = {
+  id: string
+  set: 'OLL' | 'PLL' | 'F2L'
+  name: string
+  group: string
+  alg: string
+  /** ケースの状態（標準の向き）の54文字facelets。 */
+  pattern: string
+}
+
+export function listCases(): Promise<CaseInfo[]> {
+  return request('/api/cases')
+}

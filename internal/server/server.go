@@ -49,6 +49,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/settings", s.handlePutSettings)
 	mux.HandleFunc("GET /api/export", s.handleExport)
 	mux.HandleFunc("POST /api/import", s.handleImport)
+	mux.HandleFunc("GET /api/cases", s.handleListCases)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 	})

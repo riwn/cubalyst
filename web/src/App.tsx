@@ -3,6 +3,7 @@ import { NavLink, Route, Routes } from 'react-router'
 import { HealthStatus } from './HealthStatus'
 import { CubeStoreProvider } from './cube/CubeStoreProvider'
 import { HistoryPage } from './pages/HistoryPage'
+import { PracticePage } from './pages/PracticePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { SolveDetailPage } from './pages/SolveDetailPage'
 import { StatsPage } from './pages/StatsPage'
@@ -11,7 +12,7 @@ import { SettingsProvider } from './settings/SettingsProvider'
 
 const pages: { path: string; label: string; end?: boolean; element?: ReactNode }[] = [
   { path: '/', label: 'タイマー', end: true, element: <TimerPage /> },
-  { path: '/practice', label: '練習' },
+  { path: '/practice', label: '練習', element: <PracticePage /> },
   { path: '/history', label: '履歴', element: <HistoryPage /> },
   { path: '/stats', label: '統計', element: <StatsPage /> },
   { path: '/settings', label: '設定', element: <SettingsPage /> },

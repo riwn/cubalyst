@@ -115,11 +115,11 @@ export function parseMoveLog(input: string): CubeMove[] {
     .map((m, i) => ({ ...m, localTimestamp: i * 150 }))
 }
 
-const MOVE_PATTERN = /^[URFDLB]['2]?$/
+const MOVE_PATTERN = /^[URFDLB](2'|2|')?$/
 
 function expandMove(token: string, local: number, cube: number | null): CubeMove[] {
   if (!MOVE_PATTERN.test(token)) throw new Error(`不明な回転: ${token}`)
-  if (token.endsWith('2')) {
+  if (token.includes('2')) {
     const face = token[0]
     return [
       { move: face, localTimestamp: local, cubeTimestamp: cube },
