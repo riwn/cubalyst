@@ -1,0 +1,35 @@
+# DB（ローカルデータ）
+/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# 環境変数・秘密情報
+.env
+.env.*
+!.env.example
+
+# Go
+/bin/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Node / Vite
+node_modules/
+dist/
+*.local
+.vite/
+
+# ログ
+*.log
+npm-debug.log*
+
+# エディタ・OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
