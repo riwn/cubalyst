@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import type { SolveMode } from '../api'
+import { analyzeTrend, listTrendAnalyses, type SolveMode } from '../api'
+import { AnalysisPanel } from '../components/AnalysisPanel'
 import { HistogramChart, TrendChart } from '../components/charts'
 import { MODE_LABELS } from '../format'
 import { bests, histogram, stageStats, trend } from '../solve/aggregate'
@@ -46,6 +47,7 @@ export function StatsPage() {
   const [caseId, setCaseId] = useState('')
   const [step, setStep] = useState('')
   const [histN, setHistN] = useState(100)
+  const [trendN, setTrendN] = useState(50)
 
   const range =
     period === 'custom'
@@ -232,6 +234,28 @@ export function StatsPage() {
           )}
         </>
       )}
+
+      <AnalysisPanel
+        title="傾向分析（Claude）"
+        runLabel="傾向を分析"
+        load={() => listTrendAnalyses()}
+        run={() => analyzeTrend(mode, trendN)}
+        controls={
+          <label className="small">
+            {MODE_LABELS[mode]}の直近{' '}
+            <input
+              type="number"
+              min={5}
+              max={1000}
+              step={10}
+              value={trendN}
+              onChange={(e) => setTrendN(Math.min(1000, Math.max(1, Number(e.target.value) || 1)))}
+              style={{ width: '5em' }}
+            />{' '}
+            件
+          </label>
+        }
+      />
     </div>
   )
 }

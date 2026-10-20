@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"cubalyst/internal/analysis"
 	"cubalyst/internal/db"
 	"cubalyst/internal/settings"
 	"cubalyst/internal/solves"
@@ -24,14 +25,17 @@ type Server struct {
 	staticDir string
 	solves    *solves.Store
 	settings  *settings.Store
+	analysis  *analysis.Service
 }
 
-func New(database *sql.DB, staticDir string) *Server {
+// New はサーバーを作る。llm が nil の場合、解析APIは「未設定」を返す。
+func New(database *sql.DB, staticDir string, llm analysis.LLM) *Server {
 	return &Server{
 		db:        database,
 		staticDir: staticDir,
 		solves:    solves.NewStore(database),
 		settings:  settings.NewStore(database),
+		analysis:  analysis.NewService(database, llm),
 	}
 }
 
@@ -50,6 +54,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/export", s.handleExport)
 	mux.HandleFunc("POST /api/import", s.handleImport)
 	mux.HandleFunc("GET /api/cases", s.handleListCases)
+	mux.HandleFunc("GET /api/analysis/status", s.handleAnalysisStatus)
+	mux.HandleFunc("POST /api/solves/{id}/analyses", s.handleAnalyzeSolve)
+	mux.HandleFunc("GET /api/solves/{id}/analyses", s.handleListSolveAnalyses)
+	mux.HandleFunc("POST /api/analyses/trend", s.handleAnalyzeTrend)
+	mux.HandleFunc("GET /api/analyses", s.handleListAnalyses)
+	mux.HandleFunc("DELETE /api/analyses/{id}", s.handleDeleteAnalysis)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 	})

@@ -152,3 +152,42 @@ export type CaseInfo = {
 export function listCases(): Promise<CaseInfo[]> {
   return request('/api/cases')
 }
+
+export type Analysis = {
+  id: number
+  kind: 'solve' | 'trend'
+  solve_id: number | null
+  params: { mode?: SolveMode; limit?: number }
+  input: string
+  result: string
+  model: string
+  input_tokens: number
+  output_tokens: number
+  created_at: string
+}
+
+export type AnalysisStatus = { configured: boolean; model: string; message?: string }
+
+export function getAnalysisStatus(): Promise<AnalysisStatus> {
+  return request('/api/analysis/status')
+}
+
+export function analyzeSolve(id: number): Promise<Analysis> {
+  return request(`/api/solves/${id}/analyses`, { method: 'POST' })
+}
+
+export function listSolveAnalyses(id: number): Promise<Analysis[]> {
+  return request(`/api/solves/${id}/analyses`)
+}
+
+export function analyzeTrend(mode: SolveMode, limit: number): Promise<Analysis> {
+  return request('/api/analyses/trend', { method: 'POST', body: JSON.stringify({ mode, limit }) })
+}
+
+export function listTrendAnalyses(limit = 10): Promise<Analysis[]> {
+  return request(`/api/analyses?kind=trend&limit=${limit}`)
+}
+
+export function deleteAnalysis(id: number): Promise<void> {
+  return request(`/api/analyses/${id}`, { method: 'DELETE' })
+}

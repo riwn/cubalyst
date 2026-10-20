@@ -83,6 +83,31 @@ GAN系のキューブは通信の暗号化にMACアドレスを使います。�
 - 回転ログを貼り付けて、記録時の間隔どおりに再生できます（0.5x〜4x）。形式は `"R U R' U'"` のような回転記号か、JSON配列 `[{"move":"R","cubeTimestamp":1000,"localTimestamp":20}, ...]` です。
 - 回転ログ欄の「JSONをコピー」で、実機の回転ログをそのまま再生用に保存できます。
 
+## 機能
+
+| 画面 | できること |
+|---|---|
+| タイマー | スクランブル（進捗ハイライト・間違えたときの戻し手順）、最初の回転で計測開始・完成で停止、+2/DNF、ao5/ao12 |
+| 練習 | ケース単発練習（OLL 57 / PLL 21 / F2L 41、選んだケースからランダム出題、ケース別成績）、ステップ練習（Cross / F2L / OLL / PLL の直前状態から） |
+| 履歴 | 一覧（フィルタ・ページング）、詳細（CFOPの段階タイム・解法・TPS、再生、メモ、Claudeによる解析）、export |
+| 統計 | ベスト記録、推移（single/ao5/ao12）、分布、段階別統計、Claudeによる傾向分析 |
+| 設定 | クロス色、段階の再計算、export（JSON/CSV/テキスト）、import（JSON） |
+
+各フェーズの実装計画は `docs/plans/` にあります。
+
+## Claudeによる解析
+
+ソルブ詳細の「このソルブを解析」と、統計の「傾向を分析」で Claude API を使います。サーバーを `ANTHROPIC_API_KEY` 付きで起動してください。
+
+```
+ANTHROPIC_API_KEY=sk-ant-... make dev
+```
+
+- モデルは既定で `claude-opus-5-5`、effort は `high` です（下の環境変数で変更できます）。1回の解析でおおよそ十数円〜数十円のAPI利用料がかかります（使ったトークン数は結果の横に表示されます）
+- 安全分類による拒否に備えて、サーバー側フォールバック（`fallbacks: "default"`）を有効にしています
+- 解析に渡したデータ（入力）と結果は `analyses` テーブルに保存され、画面の「入力データ」で確認できます
+- APIキーなしで画面だけ確かめたいときは `CUBALYST_CLAUDE_MOCK=1` で起動すると、決まった文面を返すモックになります（課金なし）
+
 ## 設定
 
 フラグまたは環境変数で指定できます（フラグが優先）。
@@ -92,7 +117,10 @@ GAN系のキューブは通信の暗号化にMACアドレスを使います。�
 | `-addr` | `CUBALYST_ADDR` | `127.0.0.1:8080` | 待ち受けアドレス（ループバックのみ） |
 | `-db` | `CUBALYST_DB` | `./data/cubalyst.db` | SQLiteファイルのパス |
 | `-static` | `CUBALYST_STATIC` | `./web/dist` | ビルド済みフロントエンドのディレクトリ |
-| — | `ANTHROPIC_API_KEY` | — | Claude APIキー（Phase 8で使用） |
+| — | `ANTHROPIC_API_KEY` | — | Claude APIキー（未設定なら解析機能だけ無効） |
+| — | `CUBALYST_CLAUDE_MODEL` | `claude-opus-5-5` | 解析に使うモデル |
+| — | `CUBALYST_CLAUDE_EFFORT` | `high` | effort（low / medium / high / xhigh / max） |
+| — | `CUBALYST_CLAUDE_MOCK` | — | `1` で解析をモック応答にする（開発用） |
 
 Goサーバーのポートを変えた場合は、Vite側にも `CUBALYST_API=http://127.0.0.1:<port>` を渡してください。
 
@@ -113,9 +141,18 @@ internal/config/       フラグ・環境変数の読み込み
 internal/db/           SQLite接続とマイグレーション
 internal/db/migrations マイグレーションSQL（バイナリに埋め込み、起動時に適用）
 internal/server/       HTTPルーティング・APIハンドラ・静的配信
+internal/solves/       ソルブと段階区切りの保存
+internal/export/       export（JSON / CSV / テキスト）と import
+internal/settings/     設定（クロス色）
+internal/analysis/     Claudeによる解析（入力データの集計・整形、API呼び出し、保存）
 web/                   フロントエンド（Vite + React + TypeScript）
 web/src/cube/          キューブ接続（実機・モック）、状態管理、facelets変換、時計ズレ補正
-web/src/components/    画面部品（接続パネル、3Dキューブ、回転ログなど）
+web/src/solve/         スクランブル追跡、計測セッション、CFOP段階検出、統計
+web/src/cases/         ケース練習（マスタ・手順の検証・出題）
+web/src/steps/         ステップ練習の出題
+web/src/replay/        ソルブ再生
+web/src/components/    画面部品
+web/src/pages/         画面
 data/                  DBファイル置き場（git管理外）
 ```
 
@@ -128,7 +165,26 @@ data/                  DBファイル置き場（git管理外）
 
 | メソッド | パス | 内容 |
 |---|---|---|
-| GET | `/api/health` | サーバーとDBの状態。正常時 `200 {"status":"ok","db":"ok","schema_version":1}`、DB異常時 `503` |
+| GET | `/api/health` | サーバーとDBの状態。DB異常時 `503` |
+| GET / POST | `/api/solves` | ソルブ一覧（`mode` `from` `to` `case_id` `step` `ids` `limit` `offset` `include=moves,splits` `order=asc`）/ 保存 |
+| GET / PATCH / DELETE | `/api/solves/{id}` | 取得 / ペナルティ・メモの更新 / 削除 |
+| PUT | `/api/solves/{id}/splits` | 段階区切りの置き換え（再計算用） |
+| GET / PUT | `/api/settings` | 設定（クロス色） |
+| GET | `/api/export?format=json\|csv\|txt` | export（一覧と同じフィルタ） |
+| POST | `/api/import` | JSON export の取り込み（重複はスキップ） |
+| GET | `/api/cases` | ケース練習のマスタ（`set=OLL` など） |
+| GET | `/api/analysis/status` | Claude API が使えるか |
+| GET / POST | `/api/solves/{id}/analyses` | ソルブの解析結果一覧 / 解析の実行 |
+| POST | `/api/analyses/trend` | 傾向分析（`{"mode":"full","limit":50}`） |
+| GET / DELETE | `/api/analyses`, `/api/analyses/{id}` | 解析結果の一覧（`kind=trend`）/ 削除 |
+
+### ケースのマスタ
+
+`web/src/cases/data.ts` が正です。変更したら次でマイグレーションのシード（`internal/db/migrations/0004_cases.sql`）を作り直します（テストで一致を確認しています）。F2L の41ケースは `npm run gen:f2l` で数え上げと手順探索から生成しています。
+
+```
+cd web && npm run gen:cases
+```
 
 ## バックアップ
 

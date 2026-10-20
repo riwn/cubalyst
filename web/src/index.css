@@ -742,3 +742,49 @@ button.on-accent {
 .last-case .alg {
   margin-top: 2px;
 }
+
+.analysis {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.analysis-input {
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px;
+  font-size: 0.8rem;
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+  border-radius: 6px;
+  white-space: pre-wrap;
+}
+
+.markdown {
+  line-height: 1.7;
+}
+
+.markdown h2 {
+  font-size: 1.1rem;
+  margin: 16px 0 6px;
+}
+
+.markdown h3 {
+  font-size: 1rem;
+  margin: 12px 0 4px;
+}
+
+.markdown table {
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.markdown th,
+.markdown td {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+}
+
+.markdown code {
+  padding: 0 4px;
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
+  border-radius: 4px;
+}

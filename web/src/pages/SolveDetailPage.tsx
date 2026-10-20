@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { deleteSolve, exportUrl, getSolve, replaceSplits, updateSolve, type Solve } from '../api'
+import {
+  analyzeSolve,
+  deleteSolve,
+  exportUrl,
+  getSolve,
+  listSolveAnalyses,
+  replaceSplits,
+  updateSolve,
+  type Solve,
+} from '../api'
+import { AnalysisPanel } from '../components/AnalysisPanel'
 import { SplitsTable } from '../components/SplitsTable'
 import { useCubeStore } from '../cube/hooks'
 import { ReplayPlayer } from '../replay/ReplayPlayer'
@@ -119,6 +129,14 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
       </section>
 
       {message && <p className="muted">{message}</p>}
+
+      <AnalysisPanel
+        title="Claudeによる解析"
+        runLabel="このソルブを解析"
+        load={() => listSolveAnalyses(solve.id)}
+        run={() => analyzeSolve(solve.id)}
+        reloadKey={solve.id}
+      />
     </div>
   )
 }

@@ -17,8 +17,10 @@
     "cubing": "^0.66.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
     "react-router": "^7.18.4",
     "recharts": "^3.10.1",
+    "remark-gfm": "^4.0.1",
     "rxjs": "^7.8.2",
     "smartcube-web-bluetooth": "github:poliva/smartcube-web-bluetooth#436e88a76abb"
   },

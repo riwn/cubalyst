@@ -23,7 +23,7 @@ func newTestServer(t *testing.T, staticDir string) http.Handler {
 	if err := db.Migrate(context.Background(), database); err != nil {
 		t.Fatal(err)
 	}
-	return New(database, staticDir).Handler()
+	return New(database, staticDir, nil).Handler()
 }
 
 func TestHealth(t *testing.T) {
@@ -50,7 +50,7 @@ func TestHealthDBDown(t *testing.T) {
 	}
 	database.Close()
 	rec := httptest.NewRecorder()
-	New(database, t.TempDir()).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+	New(database, t.TempDir(), nil).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503", rec.Code)
 	}
