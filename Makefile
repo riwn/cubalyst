@@ -31,7 +31,7 @@ run:
 test: web-deps
 	go vet ./...
 	go test ./...
-	cd web && npm run typecheck && npm run lint
+	cd web && npm run typecheck && npm run lint && npm test
 
 clean:
 	rm -rf bin web/dist

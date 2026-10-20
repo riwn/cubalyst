@@ -103,3 +103,182 @@ nav a.active {
 .muted {
   color: var(--muted);
 }
+
+main {
+  padding: 16px 0;
+}
+
+h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+input,
+select,
+textarea {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+}
+
+textarea {
+  width: 100%;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
+code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  word-break: break-all;
+}
+
+.small {
+  font-size: 0.8rem;
+}
+
+.warn {
+  color: #c27c0e;
+}
+
+.error {
+  color: var(--error);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.block {
+  display: block;
+}
+
+.panel {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.panel > * + * {
+  margin-top: 8px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.status-dot--on {
+  background: var(--ok);
+}
+
+.mac-dialog {
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+
+.mac-dialog input {
+  font-family: ui-monospace, monospace;
+  width: 14em;
+}
+
+.timer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 800px) {
+  .timer-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.cube-view {
+  width: 100%;
+  aspect-ratio: 1;
+  max-height: 480px;
+}
+
+.facelets-info dt {
+  color: var(--muted);
+}
+
+.facelets-info dd {
+  margin: 0 0 8px;
+}
+
+.move-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.move-pair {
+  display: flex;
+  gap: 2px;
+}
+
+.move-pair button {
+  min-width: 2.6em;
+  font-family: ui-monospace, monospace;
+}
+
+.move-log table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.move-log th,
+.move-log td {
+  padding: 2px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+.move-log td.move {
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+  text-align: left;
+}

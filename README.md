@@ -56,6 +56,28 @@ Goサーバーがビルド済みのフロントエンドも配信するので、
 
 3. Windowsのブラウザで <http://localhost:8080> を開く。
 
+## キューブの接続
+
+タイマー画面の「Connect」を押し、Chromeのデバイス選択でキューブ（GAN i4 など）を選びます。
+
+GAN系のキューブは通信の暗号化にMACアドレスを使います。取得方法は次のどちらかです。
+
+- **自動取得（推奨）**：Chromeで `chrome://flags/#enable-experimental-web-platform-features` を有効にして再起動する。キューブのアドバタイズからMACアドレスを読み取ります。
+- **手入力**：自動取得できなかったときは入力欄が出ます。MACアドレスはWindowsの「設定 → Bluetoothとデバイス」や `chrome://bluetooth-internals` で確認できます。入力した値はブラウザに保存され、次回からは聞かれません。
+
+接続後は回転・facelets・バッテリーが画面に表示され、3Dキューブが実機に同期します。
+
+- **状態リセット**：実機を完成状態にしてから押すと、実機とアプリの状態を完成状態にそろえ直します。
+- **実機の状態を取得**：実機からfaceletsを取り直します。アプリ側の状態とズレていれば、実機の状態に合わせます。
+
+### モック接続
+
+実機がなくても「モック接続」で動作確認できます。
+
+- 画面のボタン、またはキーボードの `U R F D L B`（Shiftで逆回転）で回せます。
+- 回転ログを貼り付けて、記録時の間隔どおりに再生できます（0.5x〜4x）。形式は `"R U R' U'"` のような回転記号か、JSON配列 `[{"move":"R","cubeTimestamp":1000,"localTimestamp":20}, ...]` です。
+- 回転ログ欄の「JSONをコピー」で、実機の回転ログをそのまま再生用に保存できます。
+
 ## 設定
 
 フラグまたは環境変数で指定できます（フラグが優先）。
@@ -72,9 +94,11 @@ Goサーバーのポートを変えた場合は、Vite側にも `CUBALYST_API=ht
 ## 開発
 
 ```
-make test    # go vet / go test / フロントの型チェックとlint
+make test    # go vet / go test / フロントの型チェック・lint・vitest
 make clean   # ビルド成果物を削除
 ```
+
+注意：お使いのzshで `make` が関数として定義されていて動かない場合は、`/usr/bin/make test` のようにフルパスで実行してください。
 
 ### ディレクトリ構成
 
@@ -85,6 +109,8 @@ internal/db/           SQLite接続とマイグレーション
 internal/db/migrations マイグレーションSQL（バイナリに埋め込み、起動時に適用）
 internal/server/       HTTPルーティング・APIハンドラ・静的配信
 web/                   フロントエンド（Vite + React + TypeScript）
+web/src/cube/          キューブ接続（実機・モック）、状態管理、facelets変換、時計ズレ補正
+web/src/components/    画面部品（接続パネル、3Dキューブ、回転ログなど）
 data/                  DBファイル置き場（git管理外）
 ```
 

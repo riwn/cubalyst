@@ -8,12 +8,16 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "test": "vitest run"
   },
   "dependencies": {
+    "cubing": "^0.66.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-router": "^7.18.4"
+    "react-router": "^7.18.4",
+    "rxjs": "^7.8.2",
+    "smartcube-web-bluetooth": "github:poliva/smartcube-web-bluetooth#436e88a76abb"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
@@ -22,6 +26,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "oxlint": "^1.88.0",
     "typescript": "~6.0.3",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
   }
 }

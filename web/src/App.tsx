@@ -1,8 +1,11 @@
+import type { ReactNode } from 'react'
 import { NavLink, Route, Routes } from 'react-router'
 import { HealthStatus } from './HealthStatus'
+import { CubeStoreProvider } from './cube/CubeStoreProvider'
+import { TimerPage } from './pages/TimerPage'
 
-const pages = [
-  { path: '/', label: 'タイマー', end: true },
+const pages: { path: string; label: string; end?: boolean; element?: ReactNode }[] = [
+  { path: '/', label: 'タイマー', end: true, element: <TimerPage /> },
   { path: '/practice', label: '練習' },
   { path: '/history', label: '履歴' },
   { path: '/stats', label: '統計' },
@@ -33,12 +36,14 @@ export default function App() {
         <HealthStatus />
       </header>
       <main>
-        <Routes>
-          {pages.map((p) => (
-            <Route key={p.path} path={p.path} element={<Placeholder title={p.label} />} />
-          ))}
-          <Route path="*" element={<Placeholder title="ページが見つかりません" />} />
-        </Routes>
+        <CubeStoreProvider>
+          <Routes>
+            {pages.map((p) => (
+              <Route key={p.path} path={p.path} element={p.element ?? <Placeholder title={p.label} />} />
+            ))}
+            <Route path="*" element={<Placeholder title="ページが見つかりません" />} />
+          </Routes>
+        </CubeStoreProvider>
       </main>
     </div>
   )
