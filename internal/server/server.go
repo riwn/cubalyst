@@ -14,22 +14,29 @@ import (
 	"time"
 
 	"cubalyst/internal/db"
+	"cubalyst/internal/solves"
 )
 
 // Server はAPIとビルド済みフロントエンドを配信する。
 type Server struct {
 	db        *sql.DB
 	staticDir string
+	solves    *solves.Store
 }
 
 func New(database *sql.DB, staticDir string) *Server {
-	return &Server{db: database, staticDir: staticDir}
+	return &Server{db: database, staticDir: staticDir, solves: solves.NewStore(database)}
 }
 
 // Handler はルーティング済みのハンドラを返す。
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.handleHealth)
+	mux.HandleFunc("POST /api/solves", s.handleCreateSolve)
+	mux.HandleFunc("GET /api/solves", s.handleListSolves)
+	mux.HandleFunc("GET /api/solves/{id}", s.handleGetSolve)
+	mux.HandleFunc("PATCH /api/solves/{id}", s.handleUpdateSolve)
+	mux.HandleFunc("DELETE /api/solves/{id}", s.handleDeleteSolve)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 	})

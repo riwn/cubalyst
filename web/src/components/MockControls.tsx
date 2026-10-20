@@ -4,14 +4,21 @@ import { MockConnection, parseMoveLog } from '../cube/mock'
 
 const FACES = ['U', 'R', 'F', 'D', 'L', 'B']
 
-/** モック接続時の操作パネル。ボタン／キーボードで回す、回転ログを再生する。 */
-export function MockControls() {
-  const { connection } = useCubeState()
-  if (!(connection instanceof MockConnection)) return null
-  return <MockControlsInner mock={connection} />
+type Shortcuts = {
+  /** 「スクランブルを回す」で流す手順（残りのスクランブル）。 */
+  scramble?: string[]
+  /** 「解く」で流す手順。 */
+  solution?: string[]
 }
 
-function MockControlsInner({ mock }: { mock: MockConnection }) {
+/** モック接続時の操作パネル。ボタン／キーボードで回す、回転ログを再生する。 */
+export function MockControls(props: Shortcuts) {
+  const { connection } = useCubeState()
+  if (!(connection instanceof MockConnection)) return null
+  return <MockControlsInner mock={connection} {...props} />
+}
+
+function MockControlsInner({ mock, scramble, solution }: { mock: MockConnection } & Shortcuts) {
   const [log, setLog] = useState('')
   const [speed, setSpeed] = useState(1)
   const [playing, setPlaying] = useState(false)
@@ -50,9 +57,29 @@ function MockControlsInner({ mock }: { mock: MockConnection }) {
     setPlaying(false)
   }
 
+  const playMoves = (moves: string[], playSpeed: number) => {
+    setError(null)
+    setPlaying(true)
+    mock.replay(parseMoveLog(moves.join(' ')), playSpeed, () => setPlaying(false))
+  }
+
   return (
     <section className="panel mock-controls">
       <h3>モック操作</h3>
+      {(scramble || solution) && (
+        <div className="row">
+          {scramble && (
+            <button onClick={() => playMoves(scramble, 4)} disabled={playing || scramble.length === 0}>
+              スクランブルを回す
+            </button>
+          )}
+          {solution && (
+            <button onClick={() => playMoves(solution, 1)} disabled={playing || solution.length === 0}>
+              逆手順で解く
+            </button>
+          )}
+        </div>
+      )}
       <div className="move-buttons">
         {FACES.map((f) => (
           <div key={f} className="move-pair">

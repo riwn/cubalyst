@@ -65,8 +65,8 @@ export class MockConnection implements CubeConnection {
   }
 
   async requestFacelets() {
-    const facelets = patternToFacelets(this.pattern)
-    queueMicrotask(() => this.emitter.emit({ type: 'facelets', facelets }))
+    // 応答を送る時点の状態を返す（要求から応答までの間の回転も反映される）
+    queueMicrotask(() => this.emitter.emit({ type: 'facelets', facelets: patternToFacelets(this.pattern) }))
   }
 
   async requestBattery() {
