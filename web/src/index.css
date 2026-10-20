@@ -643,3 +643,58 @@ a {
 .panel.stat-tiles > * + * {
   margin-top: 0;
 }
+
+.replay-cube {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 420px;
+}
+
+.replay-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.replay-status strong {
+  font-size: 1.4rem;
+}
+
+.replay-next .current {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.replay-stages {
+  display: flex;
+  gap: 2px;
+  margin-top: 8px;
+}
+
+.replay-stage {
+  min-width: 6px;
+  padding: 2px 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.replay-stage.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.replay-seek {
+  width: 100%;
+  margin: 4px 0;
+}
+
+button.on-accent {
+  border-color: var(--accent);
+  color: var(--accent);
+}

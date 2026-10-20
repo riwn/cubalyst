@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { deleteSolve, exportUrl, getSolve, replaceSplits, updateSolve, type Solve } from '../api'
 import { SplitsTable } from '../components/SplitsTable'
 import { useCubeStore } from '../cube/hooks'
+import { ReplayPlayer } from '../replay/ReplayPlayer'
 import { useSettings } from '../settings/hooks'
 import { computeSplits, COLOR_LABELS } from '../solve/cfop'
 import { effectiveTime, formatTime, type Penalty } from '../solve/stats'
@@ -84,6 +85,11 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
           </a>
           <button onClick={remove}>削除</button>
         </div>
+      </section>
+
+      <section className="panel">
+        <h3>再生</h3>
+        <ReplayPlayer solve={solve} kpuzzle={store.kpuzzle} />
       </section>
 
       <section className="panel">
