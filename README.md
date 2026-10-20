@@ -26,16 +26,21 @@ Web Bluetoothは**セキュアコンテキスト（`localhost` または HTTPS�
    ssh -L 5173:localhost:5173 nuc
    ```
 
-2. nuc上で、ターミナルを2つ使ってそれぞれ起動する：
+2. そのSSHセッションのまま、nuc上でGoサーバーとVite devサーバーをまとめて起動する：
 
    ```
-   make dev-server   # Goサーバー（127.0.0.1:8080）
-   make dev-web      # Vite devサーバー（127.0.0.1:5173）
+   cd ~/work/cubalyst
+   make dev
    ```
+
+   `Local: http://127.0.0.1:5173/` と表示されたら起動完了です。Ctrl+C で両方止まります。
 
 3. Windowsのブラウザで <http://localhost:5173> を開く。
 
 Viteのdevサーバーが `/api` をGoサーバーへプロキシします。
+個別に起動したい場合は `make dev-server`（Goサーバー :8080）と `make dev-web`（Vite :5173）を別々のターミナルで実行します。
+
+> SSHのターミナルに `channel N: open failed: connect failed: Connection refused` と出るのは、nuc側でViteが動いていないときにブラウザがアクセスした場合です。Viteを起動すれば出なくなります（Viteを止めている間は、開いているタブを閉じておくと出ません）。
 
 ### 本番相当（Goサーバー単体 :8080）
 

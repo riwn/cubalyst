@@ -1,9 +1,22 @@
-.PHONY: dev-server dev-web build build-web build-server run test web-deps clean
+.PHONY: dev dev-server dev-web build build-web build-server run test web-deps clean
+
+# dev ターゲットで wait -n を使うため bash にする。
+SHELL := /bin/bash
 
 # 手元のGo（1.24）で固定する。自動ツールチェーンダウンロードを無効化。
 export GOTOOLCHAIN := local
 
 BIN := bin/cubalyst
+
+# 開発用：GoサーバーとVite devサーバーを同時に起動する。
+# Ctrl+C で両方止まる。どちらかが落ちたらもう一方も止める。
+# シグナルを確実に届けるため、go run / npm を挟まず本体を直接起動する。
+dev: web-deps build-server
+	@trap 'kill $$(jobs -p) 2>/dev/null; wait' EXIT; \
+	trap 'exit 0' INT TERM; \
+	./$(BIN) & \
+	(cd web && exec ./node_modules/.bin/vite) & \
+	wait -n
 
 # 開発用：Goサーバー（127.0.0.1:8080）
 dev-server:
