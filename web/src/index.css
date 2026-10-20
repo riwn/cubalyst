@@ -1,0 +1,105 @@
+:root {
+  --bg: #f7f7f8;
+  --fg: #1d1d1f;
+  --muted: #6b6b70;
+  --border: #dcdce0;
+  --accent: #2f6fde;
+  --ok: #1f9d55;
+  --error: #d64545;
+
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171a;
+    --fg: #ececf0;
+    --muted: #9a9aa2;
+    --border: #34343a;
+    --accent: #6c9cff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+nav {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+nav a {
+  padding: 4px 12px;
+  border-radius: 6px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+nav a:hover {
+  color: var(--fg);
+}
+
+nav a.active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.health {
+  display: flex;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.health dt::after {
+  content: ':';
+}
+
+.health dd {
+  margin: 0 8px 0 0;
+}
+
+.health--ok dd {
+  color: var(--ok);
+}
+
+.health--error,
+.health--error dd {
+  color: var(--error);
+}
+
+.muted {
+  color: var(--muted);
+}
