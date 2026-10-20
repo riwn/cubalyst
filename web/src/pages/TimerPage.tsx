@@ -6,7 +6,9 @@ import { MoveLog } from '../components/MoveLog'
 import { RecentSolves } from '../components/RecentSolves'
 import { ScrambleDisplay } from '../components/ScrambleDisplay'
 import { TimerDisplay } from '../components/TimerDisplay'
-import { useCubeState } from '../cube/hooks'
+import { useCubeState, useCubeStore } from '../cube/hooks'
+import { useSettings } from '../settings/hooks'
+import { withSplits } from '../solve/cfop'
 import { fullSolveSource } from '../solve/exercises'
 import { useSaveSolve, useSessionState, useSolveList, useSolveSession } from '../solve/hooks'
 import { invert, splitAlg } from '../solve/notation'
@@ -19,7 +21,11 @@ export function TimerPage() {
   const recent = useSolveList(RECENT)
   const { reload } = recent
   const { save, error: saveError } = useSaveSolve(useCallback(() => reload(), [reload]))
-  const session = useSolveSession(fullSolveSource, save)
+  const store = useCubeStore()
+  const { settings } = useSettings()
+  const session = useSolveSession(fullSolveSource, (solve) =>
+    save(withSplits(store.kpuzzle, solve, settings.cross_color)),
+  )
   const state = useSessionState(session)
   const { status } = useCubeState()
 

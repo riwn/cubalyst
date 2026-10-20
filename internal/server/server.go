@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"cubalyst/internal/db"
+	"cubalyst/internal/settings"
 	"cubalyst/internal/solves"
 )
 
@@ -22,10 +23,16 @@ type Server struct {
 	db        *sql.DB
 	staticDir string
 	solves    *solves.Store
+	settings  *settings.Store
 }
 
 func New(database *sql.DB, staticDir string) *Server {
-	return &Server{db: database, staticDir: staticDir, solves: solves.NewStore(database)}
+	return &Server{
+		db:        database,
+		staticDir: staticDir,
+		solves:    solves.NewStore(database),
+		settings:  settings.NewStore(database),
+	}
 }
 
 // Handler はルーティング済みのハンドラを返す。
@@ -37,6 +44,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/solves/{id}", s.handleGetSolve)
 	mux.HandleFunc("PATCH /api/solves/{id}", s.handleUpdateSolve)
 	mux.HandleFunc("DELETE /api/solves/{id}", s.handleDeleteSolve)
+	mux.HandleFunc("PUT /api/solves/{id}/splits", s.handleReplaceSplits)
+	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
+	mux.HandleFunc("PUT /api/settings", s.handlePutSettings)
+	mux.HandleFunc("GET /api/export", s.handleExport)
+	mux.HandleFunc("POST /api/import", s.handleImport)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 	})

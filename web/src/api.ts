@@ -1,5 +1,6 @@
 // Goサーバー（/api）へのクライアント。
 
+import type { CrossColor, Split } from './solve/cfop'
 import type { Penalty } from './solve/stats'
 
 export type Health = {
@@ -39,6 +40,7 @@ export type Solve = {
   case_id: string | null
   step: string | null
   note: string
+  splits?: Split[]
 }
 
 export type NewSolve = Omit<Solve, 'id'>
@@ -53,6 +55,7 @@ export type SolveFilter = {
   limit?: number
   offset?: number
   includeMoves?: boolean
+  includeSplits?: boolean
   order?: 'asc' | 'desc'
 }
 
@@ -80,7 +83,8 @@ export function filterToQuery(f: SolveFilter): string {
   if (f.ids?.length) q.set('ids', f.ids.join(','))
   if (f.limit !== undefined) q.set('limit', String(f.limit))
   if (f.offset) q.set('offset', String(f.offset))
-  if (f.includeMoves) q.set('include', 'moves')
+  const include = [f.includeMoves && 'moves', f.includeSplits && 'splits'].filter(Boolean)
+  if (include.length) q.set('include', include.join(','))
   if (f.order) q.set('order', f.order)
   return q.toString()
 }
@@ -103,4 +107,34 @@ export function updateSolve(id: number, patch: { penalty?: Penalty; note?: strin
 
 export function deleteSolve(id: number): Promise<void> {
   return request(`/api/solves/${id}`, { method: 'DELETE' })
+}
+
+export function replaceSplits(id: number, splits: Split[]): Promise<Solve> {
+  return request(`/api/solves/${id}/splits`, { method: 'PUT', body: JSON.stringify(splits) })
+}
+
+export type Settings = {
+  cross_color: CrossColor
+}
+
+export function getSettings(): Promise<Settings> {
+  return request('/api/settings')
+}
+
+export function putSettings(s: Settings): Promise<Settings> {
+  return request('/api/settings', { method: 'PUT', body: JSON.stringify(s) })
+}
+
+export type ExportFormat = 'json' | 'csv' | 'txt'
+
+/** export のダウンロードURL（limit は既定で無制限）。 */
+export function exportUrl(format: ExportFormat, f: SolveFilter = {}): string {
+  const q = filterToQuery({ ...f, includeMoves: false, includeSplits: false })
+  return `/api/export?format=${format}${q ? `&${q}` : ''}`
+}
+
+export type ImportResult = { imported: number; skipped: number; errors: string[] }
+
+export async function importSolves(json: string): Promise<ImportResult> {
+  return request('/api/import', { method: 'POST', body: json, headers: { 'Content-Type': 'application/json' } })
 }

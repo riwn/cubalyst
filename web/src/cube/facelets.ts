@@ -10,7 +10,7 @@ import { KPattern, type KPuzzle } from 'cubing/kpuzzle'
 
 export const SOLVED_FACELETS = 'UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB'
 
-const CORNER_SLOTS: { name: string; facelets: number[] }[] = [
+export const CORNER_SLOTS: { name: string; facelets: number[] }[] = [
   { name: 'UFR', facelets: [8, 20, 9] },
   { name: 'URB', facelets: [2, 11, 45] },
   { name: 'UBL', facelets: [0, 47, 36] },
@@ -21,7 +21,7 @@ const CORNER_SLOTS: { name: string; facelets: number[] }[] = [
   { name: 'DBR', facelets: [35, 51, 17] },
 ]
 
-const EDGE_SLOTS: { name: string; facelets: number[] }[] = [
+export const EDGE_SLOTS: { name: string; facelets: number[] }[] = [
   { name: 'UF', facelets: [7, 19] },
   { name: 'UR', facelets: [5, 10] },
   { name: 'UB', facelets: [1, 46] },

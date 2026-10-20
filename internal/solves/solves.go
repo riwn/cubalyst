@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -23,7 +24,7 @@ const (
 
 // Penalty の値。空文字はペナルティなし。
 const (
-	PenaltyNone = ""
+	PenaltyNone  = ""
 	PenaltyPlus2 = "+2"
 	PenaltyDNF   = "DNF"
 )
@@ -34,6 +35,19 @@ type Move struct {
 	CubeTS  *float64 `json:"cube_ts"`  // キューブ側タイムスタンプ
 	LocalTS *float64 `json:"local_ts"` // PC側タイムスタンプ
 	T       float64  `json:"t"`        // 補正後の、ソルブ開始からの相対ms
+}
+
+// Stages はCFOPの段階（順序どおり）。
+var Stages = []string{"cross", "f2l1", "f2l2", "f2l3", "f2l4", "oll", "pll"}
+
+// Split はCFOPの1段階の区切り。
+type Split struct {
+	Stage      string `json:"stage"`
+	StartMS    int64  `json:"start_ms"`
+	EndMS      int64  `json:"end_ms"`
+	MoveCount  int    `json:"move_count"`
+	StartIndex int    `json:"start_index"` // 回転ログ上の範囲 [StartIndex, EndIndex)
+	EndIndex   int    `json:"end_index"`
 }
 
 // Solve は1回のソルブ。
@@ -48,6 +62,7 @@ type Solve struct {
 	CaseID   *string   `json:"case_id"`
 	Step     *string   `json:"step"`
 	Note     string    `json:"note"`
+	Splits   []Split   `json:"splits,omitempty"`
 }
 
 // Validate は保存前の値を検証する。
@@ -77,7 +92,34 @@ func (s *Solve) Validate() error {
 			return fmt.Errorf("moves[%d]: move is empty", i)
 		}
 	}
+	return ValidateSplits(s.Splits, len(s.Moves))
+}
+
+// ValidateSplits は段階の値を検証する。moveCount は回転ログの手数。
+func ValidateSplits(splits []Split, moveCount int) error {
+	seen := map[string]bool{}
+	for _, sp := range splits {
+		if !isStage(sp.Stage) {
+			return fmt.Errorf("invalid stage %q", sp.Stage)
+		}
+		if seen[sp.Stage] {
+			return fmt.Errorf("duplicated stage %q", sp.Stage)
+		}
+		seen[sp.Stage] = true
+		if sp.EndMS < sp.StartMS || sp.EndIndex < sp.StartIndex || sp.StartIndex < 0 || sp.EndIndex > moveCount {
+			return fmt.Errorf("stage %s: invalid range", sp.Stage)
+		}
+	}
 	return nil
+}
+
+func isStage(s string) bool {
+	for _, st := range Stages {
+		if st == s {
+			return true
+		}
+	}
+	return false
 }
 
 func validatePenalty(p string) error {
@@ -108,7 +150,12 @@ func (st *Store) Create(ctx context.Context, s *Solve) error {
 	if err != nil {
 		return err
 	}
-	res, err := st.db.ExecContext(ctx, `INSERT INTO solves
+	tx, err := st.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, `INSERT INTO solves
 		(mode, solved_at, total_ms, penalty, scramble, moves, case_id, step, note)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		s.Mode, s.SolvedAt.UTC().Format(timeLayout), s.TotalMS, s.Penalty, s.Scramble,
@@ -116,8 +163,98 @@ func (st *Store) Create(ctx context.Context, s *Solve) error {
 	if err != nil {
 		return err
 	}
-	s.ID, err = res.LastInsertId()
-	return err
+	if s.ID, err = res.LastInsertId(); err != nil {
+		return err
+	}
+	if err := insertSplits(ctx, tx, s.ID, s.Splits); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func insertSplits(ctx context.Context, tx *sql.Tx, solveID int64, splits []Split) error {
+	for _, sp := range splits {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO solve_splits
+			(solve_id, stage, start_ms, end_ms, move_count, start_index, end_index)
+			VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			solveID, sp.Stage, sp.StartMS, sp.EndMS, sp.MoveCount, sp.StartIndex, sp.EndIndex); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ReplaceSplits はソルブの段階をすべて置き換える（段階の再計算用）。
+func (st *Store) ReplaceSplits(ctx context.Context, id int64, splits []Split) error {
+	s, err := st.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := ValidateSplits(splits, len(s.Moves)); err != nil {
+		return err
+	}
+	tx, err := st.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM solve_splits WHERE solve_id = ?`, id); err != nil {
+		return err
+	}
+	if err := insertSplits(ctx, tx, id, splits); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// loadSplits は複数ソルブの段階をまとめて読み込む。
+func (st *Store) loadSplits(ctx context.Context, list []Solve) error {
+	if len(list) == 0 {
+		return nil
+	}
+	index := make(map[int64]int, len(list))
+	args := make([]any, len(list))
+	for i, s := range list {
+		index[s.ID] = i
+		args[i] = s.ID
+	}
+	// SQLiteの変数上限を避けるため、件数が多いときは全件から絞り込む
+	q := `SELECT solve_id, stage, start_ms, end_ms, move_count, start_index, end_index FROM solve_splits`
+	if len(list) <= 500 {
+		q += ` WHERE solve_id IN (` + strings.TrimSuffix(strings.Repeat("?,", len(list)), ",") + `)`
+	} else {
+		args = nil
+	}
+	rows, err := st.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var sp Split
+		if err := rows.Scan(&id, &sp.Stage, &sp.StartMS, &sp.EndMS, &sp.MoveCount, &sp.StartIndex, &sp.EndIndex); err != nil {
+			return err
+		}
+		if i, ok := index[id]; ok {
+			list[i].Splits = append(list[i].Splits, sp)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for i := range list {
+		sortSplits(list[i].Splits)
+	}
+	return nil
+}
+
+func sortSplits(splits []Split) {
+	order := map[string]int{}
+	for i, st := range Stages {
+		order[st] = i
+	}
+	sort.Slice(splits, func(a, b int) bool { return order[splits[a].Stage] < order[splits[b].Stage] })
 }
 
 func nonNilMoves(m []Move) []Move {
@@ -139,6 +276,8 @@ type Filter struct {
 	Offset int
 	// IncludeMoves が false の場合、Moves を読み込まない。
 	IncludeMoves bool
+	// IncludeSplits が true の場合、Splits も読み込む。
+	IncludeSplits bool
 	// Ascending が true なら古い順、false なら新しい順。
 	Ascending bool
 }
@@ -214,7 +353,16 @@ func (st *Store) List(ctx context.Context, f Filter) ([]Solve, int, error) {
 		}
 		out = append(out, s)
 	}
-	return out, total, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	rows.Close()
+	if f.IncludeSplits {
+		if err := st.loadSplits(ctx, out); err != nil {
+			return nil, 0, err
+		}
+	}
+	return out, total, nil
 }
 
 // Get は1件取得する。
@@ -225,7 +373,14 @@ func (st *Store) Get(ctx context.Context, id int64) (Solve, error) {
 	if errors.Is(err, sql.ErrNoRows) {
 		return Solve{}, ErrNotFound
 	}
-	return s, err
+	if err != nil {
+		return Solve{}, err
+	}
+	list := []Solve{s}
+	if err := st.loadSplits(ctx, list); err != nil {
+		return Solve{}, err
+	}
+	return list[0], nil
 }
 
 // Update はペナルティとメモを更新する。nil の項目は変更しない。
@@ -286,4 +441,12 @@ func scanSolve(r scanner) (Solve, error) {
 		s.Step = &step.String
 	}
 	return s, nil
+}
+
+// Exists は同じ solved_at・scramble・total_ms のソルブがあるかを返す（import時の重複判定）。
+func (st *Store) Exists(ctx context.Context, s Solve) (bool, error) {
+	var n int
+	err := st.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM solves WHERE solved_at = ? AND scramble = ? AND total_ms = ?`,
+		s.SolvedAt.UTC().Format(timeLayout), s.Scramble, s.TotalMS).Scan(&n)
+	return n > 0, err
 }

@@ -59,15 +59,16 @@ func (s *Server) handleListSolves(w http.ResponseWriter, r *http.Request) {
 //	from, to: RFC3339 または YYYY-MM-DD（to は排他的）
 //	ids: カンマ区切り
 //	limit: 既定50、0で無制限 / offset
-//	include=moves: 回転ログも返す / order=asc: 古い順
+//	include=moves,splits: 回転ログ・段階も返す / order=asc: 古い順
 func parseFilter(q url.Values) (solves.Filter, error) {
 	f := solves.Filter{
-		Mode:         q.Get("mode"),
-		CaseID:       q.Get("case_id"),
-		Step:         q.Get("step"),
-		Limit:        defaultListLimit,
-		IncludeMoves: q.Get("include") == "moves",
-		Ascending:    q.Get("order") == "asc",
+		Mode:          q.Get("mode"),
+		CaseID:        q.Get("case_id"),
+		Step:          q.Get("step"),
+		Limit:         defaultListLimit,
+		IncludeMoves:  hasInclude(q, "moves"),
+		IncludeSplits: hasInclude(q, "splits"),
+		Ascending:     q.Get("order") == "asc",
 	}
 	var err error
 	if f.From, err = parseTimeParam(q.Get("from")); err != nil {
@@ -96,6 +97,18 @@ func parseFilter(q url.Values) (solves.Filter, error) {
 		}
 	}
 	return f, nil
+}
+
+// hasInclude は include=moves,splits のような指定に name が含まれるかを返す。
+func hasInclude(q url.Values, name string) bool {
+	for _, v := range q["include"] {
+		for p := range strings.SplitSeq(v, ",") {
+			if strings.TrimSpace(p) == name {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func parseTimeParam(v string) (time.Time, error) {

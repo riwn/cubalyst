@@ -2,14 +2,18 @@ import type { ReactNode } from 'react'
 import { NavLink, Route, Routes } from 'react-router'
 import { HealthStatus } from './HealthStatus'
 import { CubeStoreProvider } from './cube/CubeStoreProvider'
+import { HistoryPage } from './pages/HistoryPage'
+import { SettingsPage } from './pages/SettingsPage'
+import { SolveDetailPage } from './pages/SolveDetailPage'
 import { TimerPage } from './pages/TimerPage'
+import { SettingsProvider } from './settings/SettingsProvider'
 
 const pages: { path: string; label: string; end?: boolean; element?: ReactNode }[] = [
   { path: '/', label: 'タイマー', end: true, element: <TimerPage /> },
   { path: '/practice', label: '練習' },
-  { path: '/history', label: '履歴' },
+  { path: '/history', label: '履歴', element: <HistoryPage /> },
   { path: '/stats', label: '統計' },
-  { path: '/settings', label: '設定' },
+  { path: '/settings', label: '設定', element: <SettingsPage /> },
 ]
 
 function Placeholder({ title }: { title: string }) {
@@ -36,14 +40,17 @@ export default function App() {
         <HealthStatus />
       </header>
       <main>
-        <CubeStoreProvider>
-          <Routes>
-            {pages.map((p) => (
-              <Route key={p.path} path={p.path} element={p.element ?? <Placeholder title={p.label} />} />
-            ))}
-            <Route path="*" element={<Placeholder title="ページが見つかりません" />} />
-          </Routes>
-        </CubeStoreProvider>
+        <SettingsProvider>
+          <CubeStoreProvider>
+            <Routes>
+              {pages.map((p) => (
+                <Route key={p.path} path={p.path} element={p.element ?? <Placeholder title={p.label} />} />
+              ))}
+              <Route path="/history/:id" element={<SolveDetailPage />} />
+              <Route path="*" element={<Placeholder title="ページが見つかりません" />} />
+            </Routes>
+          </CubeStoreProvider>
+        </SettingsProvider>
       </main>
     </div>
   )
