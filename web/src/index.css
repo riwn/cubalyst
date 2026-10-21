@@ -258,6 +258,11 @@ code {
   margin-top: 8px;
 }
 
+/* 横並びの面では縦の間隔を付けない（付けると先頭だけ上にずれる） */
+.panel.row > * + * {
+  margin-top: 0;
+}
+
 .status-dot {
   width: 10px;
   height: 10px;
@@ -398,6 +403,15 @@ code {
 
 .scramble-actions {
   justify-content: flex-start;
+  gap: 8px;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 7px;
+  line-height: 1;
 }
 
 /* タイマー：画面の主役。インスペクション中は黄面の帯になる */
@@ -410,6 +424,7 @@ code {
 
 .timer-time {
   font-family: var(--font-num);
+  user-select: none;
   font-size: clamp(4.5rem, 19vw, 10.5rem);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -1273,6 +1288,29 @@ button.danger-solid {
 
 .drill-alg {
   font-size: 1.2rem;
+}
+
+.drill-alg-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drill-alg-choice {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 8px 3px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.drill-alg-choice .alg {
+  font-size: 1.05rem;
+}
+
+.drill-alg-choice.selected {
+  background: color-mix(in srgb, var(--face) 35%, transparent);
 }
 
 .drill-head {

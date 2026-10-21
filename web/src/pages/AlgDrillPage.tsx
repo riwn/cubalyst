@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createSolve, listCases, type CaseInfo } from '../api'
+import { algsFor } from '../cases/algs'
 import type { DrillAttempt } from '../cases/drill'
 import { useAlgDrill, useDrillState } from '../cases/hooks'
 import { scrambleFor } from '../cases/exercise'
@@ -29,6 +30,27 @@ function loadTarget(id: string): number {
   }
 }
 
+const algKey = (id: string) => `cubalyst.drillAlg.${id}`
+
+/** 前回選んだ手順（選べる手順に無ければ標準手順）。 */
+function loadAlg(c: CaseInfo): string {
+  try {
+    const v = localStorage.getItem(algKey(c.id))
+    if (v && algsFor(c).includes(v)) return v
+  } catch {
+    // 読めなければ標準手順
+  }
+  return c.alg
+}
+
+function saveAlg(id: string, alg: string) {
+  try {
+    localStorage.setItem(algKey(id), alg)
+  } catch {
+    // 保存できなくても練習はできる
+  }
+}
+
 function saveTarget(id: string, sec: number) {
   try {
     localStorage.setItem(targetKey(id), String(sec))
@@ -37,13 +59,14 @@ function saveTarget(id: string, sec: number) {
   }
 }
 
-/** 手順練習：ケースを1つ選び、その手順を何度も回して1回ごとの時間を測る。 */
+/** 手順練習：ケースと手順を1つ選び、その手順を何度も回して1回ごとの時間を測る。 */
 export function AlgDrillPage() {
   const [cases, setCases] = useState<CaseInfo[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<SetName>('PLL')
+  const [tab, setTab] = useState<SetName>('OLL')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
+  const [chosenAlg, setChosenAlg] = useState<Record<string, string>>({})
   const history = useSolveList({ mode: 'case', limit: 0 })
   const stats = useMemo(() => caseStats(history.solves), [history.solves])
 
@@ -54,10 +77,15 @@ export function AlgDrillPage() {
   }, [])
 
   const selected = cases.find((c) => c.id === selectedId) ?? null
+  const alg = selected ? (chosenAlg[selected.id] ?? loadAlg(selected)) : ''
+  const chooseAlg = (id: string, a: string) => {
+    setChosenAlg((prev) => ({ ...prev, [id]: a }))
+    saveAlg(id, a)
+  }
   if (error) return <p className="error">{error}</p>
 
   if (running && selected) {
-    return <DrillView c={selected} onBack={() => setRunning(false)} onSaved={history.reload} />
+    return <DrillView c={selected} alg={alg} onBack={() => setRunning(false)} onSaved={history.reload} />
   }
 
   const inTab = cases.filter((c) => c.set === tab)
@@ -71,7 +99,7 @@ export function AlgDrillPage() {
             {s}
           </button>
         ))}
-        <span className="muted small">練習したいケースを1つ選んでください</span>
+        <span className="muted small">練習したいケースを1つ選んでください（手順が複数あるケースは回す手順も選べます）</span>
       </section>
 
       {selected && (
@@ -80,7 +108,24 @@ export function AlgDrillPage() {
             <CaseDiagram c={selected} size={96} />
             <div className="drill-selected-info">
               <strong>{selected.name}</strong>
-              <div className="alg drill-alg">{selected.alg}</div>
+              {algsFor(selected).length > 1 ? (
+                <div className="drill-alg-choices" role="radiogroup" aria-label="回す手順">
+                  {algsFor(selected).map((a, i) => (
+                    <label key={a} className={`drill-alg-choice ${a === alg ? 'selected' : ''}`}>
+                      <input
+                        type="radio"
+                        name="drill-alg"
+                        checked={a === alg}
+                        onChange={() => chooseAlg(selected.id, a)}
+                      />
+                      <span className="alg">{a}</span>
+                      {i === 0 && <span className="muted small">標準</span>}
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <div className="alg drill-alg">{selected.alg}</div>
+              )}
               <div className="muted small">
                 全期間：{stats.get(selected.id)?.count ?? 0}回 ・ 平均 {formatTime(stats.get(selected.id)?.mean)} ・ ベスト{' '}
                 {formatTime(stats.get(selected.id)?.best)}
@@ -123,7 +168,7 @@ export function AlgDrillPage() {
 }
 
 /** 練習中の画面。 */
-function DrillView({ c, onBack, onSaved }: { c: CaseInfo; onBack: () => void; onSaved: () => void }) {
+function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBack: () => void; onSaved: () => void }) {
   const store = useCubeStore()
   const { settings } = useSettings()
   const { status, connection } = useCubeState()
@@ -138,7 +183,7 @@ function DrillView({ c, onBack, onSaved }: { c: CaseInfo; onBack: () => void; on
     () => holdRotation(store.kpuzzle.defaultPattern(), settings.hold_bottom, settings.hold_front),
     [store.kpuzzle, settings.hold_bottom, settings.hold_front],
   )
-  const drill = useAlgDrill(store, c.alg, rotation)
+  const drill = useAlgDrill(store, alg, rotation)
   const frame = useHoldFrame()
   const hold = useMemo(() => ({ rotation, frame }), [rotation, frame])
 
@@ -227,7 +272,7 @@ function DrillView({ c, onBack, onSaved }: { c: CaseInfo; onBack: () => void; on
         <CaseDiagram c={c} size={88} />
         <div>
           <strong>{c.name}</strong>
-          <div className="alg drill-alg">{c.alg}</div>
+          <div className="alg drill-alg">{alg}</div>
           <div className="muted small">
             揃っていなくても大丈夫です。手順を回し終えるたびに自動で記録します（前後のAUF・別の面での実行もOK）。
           </div>
@@ -294,7 +339,7 @@ function DrillView({ c, onBack, onSaved }: { c: CaseInfo; onBack: () => void; on
             )}
           </section>
           {saveError && <p className="error">{saveError}</p>}
-          {debug && connection instanceof MockConnection && <MockDrillButton mock={connection} alg={c.alg} rotation={rotation} />}
+          {debug && connection instanceof MockConnection && <MockDrillButton mock={connection} alg={alg} rotation={rotation} />}
         </div>
       </div>
     </div>
