@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { connectBluetoothCube, isWebBluetoothAvailable, normalizeMac } from '../cube/bluetooth'
+import { canWatchAdvertisements, connectBluetoothCube, isWebBluetoothAvailable, normalizeMac } from '../cube/bluetooth'
 import { useCubeState, useCubeStore } from '../cube/hooks'
 import { MockConnection } from '../cube/mock'
 
@@ -92,10 +92,21 @@ function MacDialog({ deviceName }: { deviceName: string }) {
       <p>
         <strong>{deviceName}</strong> のMACアドレスを自動取得できませんでした。入力してください（初回のみ。以降は保存されます）。
       </p>
+      {canWatchAdvertisements() ? (
+        <p className="muted small">
+          自動取得の機能は有効ですが、8秒以内にキューブの電波（アドバタイズ）からMACアドレスを読めませんでした。
+          キューブを何回か回して起こす、スマホなど他の機器との接続を切る、ページを再読み込みしてから接続し直す、を試してください。
+          詳しい経過はDevTools（F12）のConsoleに <code>[cubalyst bluetooth]</code> として出ています。
+        </p>
+      ) : (
+        <p className="muted small">
+          自動取得の機能が無効です。Chromeの <code>chrome://flags/#enable-experimental-web-platform-features</code>{' '}
+          を有効にしてChromeを再起動すると、自動で取得できるようになります。
+        </p>
+      )}
       <p className="muted small">
-        自動取得するには、Chromeの <code>chrome://flags/#enable-experimental-web-platform-features</code>{' '}
-        を有効にします。MACアドレスはWindowsの「設定 → Bluetoothとデバイス」や{' '}
-        <code>chrome://bluetooth-internals</code> で確認できます。
+        手動で調べる場合：<code>chrome://bluetooth-internals</code> の Devices タブで Start Scan を押し、
+        {deviceName} の Address を確認してください（名前の末尾 {deviceName.split('_').pop()} がアドレスの末尾と一致することが多いです）。
       </p>
       <div className="row">
         <input

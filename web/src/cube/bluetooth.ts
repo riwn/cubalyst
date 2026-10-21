@@ -44,25 +44,50 @@ export function isWebBluetoothAvailable(): boolean {
   return typeof navigator !== 'undefined' && 'bluetooth' in navigator && window.isSecureContext
 }
 
+/**
+ * アドバタイズ（キューブが出している電波）を読めるか。MACアドレスの自動取得に必要で、
+ * Chromeでは chrome://flags の「Experimental Web Platform features」を有効にすると使える。
+ */
+export function canWatchAdvertisements(): boolean {
+  const ctor = (globalThis as { BluetoothDevice?: { prototype: object } }).BluetoothDevice
+  return ctor !== undefined && 'watchAdvertisements' in ctor.prototype
+}
+
+/** 接続処理の経過をコンソールに出す（MAC自動取得の失敗などの切り分け用）。 */
+function debugLog(start: number, message: string) {
+  console.info(`[cubalyst bluetooth +${Math.round(performance.now() - start)}ms] ${message}`)
+}
+
 export async function connectBluetoothCube(opts: BluetoothConnectOptions): Promise<CubeConnection> {
   if (!isWebBluetoothAvailable()) {
     throw new Error(
       'Web Bluetoothが使えません。Chrome/Edgeで http://localhost から開いているか確認してください（LAN IPでは動きません）。',
     )
   }
+  const start = performance.now()
+  debugLog(start, `connect: watchAdvertisements ${canWatchAdvertisements() ? 'available' : 'NOT available (flag off?)'}`)
   let deviceName = ''
   const conn = await connectSmartCube({
-    onStatus: opts.onStatus,
+    // アドバタイズの待ち時間を 2.5秒 → 8秒 に延ばす（GANではこれ以外の動作は変わらない）
+    enableAddressSearch: true,
+    onStatus: (msg) => {
+      debugLog(start, `status: ${msg}`)
+      opts.onStatus?.(msg)
+    },
     macAddressProvider: async (device, isFallbackCall) => {
       deviceName = device.name ?? ''
       if (!isFallbackCall) {
         // 1回目は保存済みのMACだけ返す。なければライブラリがアドバタイズから取得を試みる。
-        return loadSavedMac(deviceName)
+        const saved = loadSavedMac(deviceName)
+        debugLog(start, `mac provider (1st): device=${deviceName} saved=${saved ?? 'none'}`)
+        return saved
       }
+      debugLog(start, 'mac provider (fallback): advertisement did not give a MAC, asking user')
       const input = await opts.requestMac(deviceName || '不明なデバイス')
       return input ? normalizeMac(input) : null
     },
   })
+  debugLog(start, `connected: ${conn.deviceName} protocol=${conn.protocol.name} mac=${conn.deviceMAC}`)
   if (conn.deviceMAC) saveMac(conn.deviceName || deviceName, conn.deviceMAC)
   return new BluetoothCubeConnection(conn)
 }
