@@ -103,12 +103,71 @@ VLAN を分けている場合は、ルーター側でも、ほかの VLAN から
 - アドレスバーに警告が出なければ、証明書は信頼されています。
 - ヘッダー右上の「Connect」が押せる状態なら、Web Bluetooth が使えます（使えないときは押せない状態になり、理由がツールチップに出ます）。
 
+## 名前で開く（任意・複数のアプリを公開するとき）
+
+ここまでの手順では、`https://<サーバーのIP>` の 443 番を Cubalyst だけが使います。同じサーバーでほかのアプリも公開したいときは、アプリごとに名前（`https://cubalyst.server.home.arpa`、`https://wiki.server.home.arpa` など）を付けて分けると、443 番の1つで済み、ファイアウォールのルールも増えません。
+
+`home.arpa` は家庭内のネットワーク用に予約されている名前で（[RFC 8375](https://www.rfc-editor.org/rfc/rfc8375)）、外の名前とぶつかりません。`server` の部分は、サーバーのホスト名など好きな名前にしてください。
+
+名前を引けるようにするために、サーバーで小さな DNS（dnsmasq）を動かし、`*.server.home.arpa` をすべてサーバーに向けます。ルーターに名前を登録する機能があれば、そちらを使ってもかまいません。
+
+```
+端末 ── DNS ──▶ サーバーの dnsmasq（:53）
+                 ├ *.server.home.arpa → サーバーのIP
+                 └ それ以外 → 今まで使っていた DNS（ルーターなど）へ転送
+```
+
+以下、`192.168.1.1` を今まで使っていた DNS（`resolvectl status` の `Current DNS Server`。多くはルーター）に読み替えてください。
+
+### DNS を動かす
+
+dnsmasq パッケージではなく、本体だけ（`dnsmasq-base`）を入れ、専用のサービスとして動かします。dnsmasq パッケージを入れると、既定の設定ですべてのアドレスの 53 番を待ち受けようとして systemd-resolved とぶつかるうえ、サーバー自身の名前解決の設定も書き換えるためです。
+
+```
+sudo apt install -y dnsmasq-base
+sed -e 's/192\.168\.1\.10/<サーバーのIP>/g' -e 's/192\.168\.1\.1$/<今までのDNS>/' -e 's/server\.home\.arpa/<名前>.home.arpa/g' deploy/dnsmasq-home-arpa.conf | sudo tee /etc/dnsmasq-home-arpa.conf
+sudo cp deploy/home-dns.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now home-dns
+sudo ufw allow from 192.168.1.0/24 to 192.168.1.10 port 53 comment dns
+```
+
+サーバー上で `dig @<サーバーのIP> cubalyst.<名前>.home.arpa +short` を実行し、サーバーのIPが返れば動いています。
+
+### 端末がこの DNS を使うようにする
+
+ルーターの DHCP の設定で、端末に配る DNS サーバーをサーバーのIPにします（VLAN を分けている場合は、使いたい VLAN の設定で行います）。端末は、次に DHCP を更新したとき（Wi-Fi のつなぎ直しや再起動）から、この DNS を使います。
+
+- サーバーが止まると、その端末は外の名前も引けなくなります。2台目の DNS にルーターなどを入れておくこともできますが、その場合、端末がたまにそちらに問い合わせて、`*.home.arpa` の名前が引けないことがあります。
+- Android の「プライベート DNS」に特定のサービス（`dns.google` など）を指定していると、この DNS を使いません。「自動」にしておきます。Chrome の「セキュア DNS」で特定のサービスを選んでいる場合も同じです。
+
+### Caddy を名前で分ける設定にする
+
+[`deploy/Caddyfile.home-arpa.example`](../deploy/Caddyfile.home-arpa.example) を書き換えて、`/etc/caddy/Caddyfile` に置きます。
+
+```
+sed -e 's/192\.168\.1\.10/<サーバーのIP>/g' -e 's/server\.home\.arpa/<名前>.home.arpa/g' deploy/Caddyfile.home-arpa.example | sudo tee /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
+- Cubalyst は `https://cubalyst.<名前>.home.arpa` で開けます。
+- `https://<サーバーのIP>` は、ルート証明書の配布（`/caddy-root.crt`）と、名前で開くよう案内するだけになります。
+- アプリを増やすときは、Caddyfile にサイトを1つ足して `sudo systemctl reload caddy` するだけです。DNS とファイアウォールの設定は変えなくてかまいません。
+- 証明書は同じ認証局が発行するので、各端末に入れたルート証明書はそのまま使えます。
+
 ## やめるとき
 
 ```
 systemctl --user disable --now cubalyst
 sudo ufw delete allow from 192.168.1.0/24 to 192.168.1.10 port 443 proto tcp
 sudo systemctl disable --now caddy
+```
+
+「名前で開く」の DNS も止めるときは、先にルーターの DHCP で配る DNS を元に戻してから、次を実行します。
+
+```
+sudo systemctl disable --now home-dns
+sudo ufw delete allow from 192.168.1.0/24 to 192.168.1.10 port 53
 ```
 
 各端末に入れたルート証明書も、それぞれの証明書の管理画面から削除できます。

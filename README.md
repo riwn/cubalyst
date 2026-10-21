@@ -60,7 +60,7 @@ ssh -L 5173:localhost:5173 <server>
 
 ### 同じLANのほかの端末から使う
 
-サーバーを据え置きで常時動かし、同じLANのPCやスマホから `https://<サーバーのIP>` で開けるようにすることもできます。Cubalyst を systemd で常駐させ、Caddy で HTTPS 化する手順を [docs/lan.md](docs/lan.md) にまとめています。
+サーバーを据え置きで常時動かし、同じLANのPCやスマホから `https://<サーバーのIP>` で開けるようにすることもできます。Cubalyst を systemd で常駐させ、Caddy で HTTPS 化する手順を [docs/lan.md](docs/lan.md) にまとめています。同じサーバーで複数のアプリを公開するときに、`https://cubalyst.<名前>.home.arpa` のように名前で分ける方法も載せています。
 
 ## キューブの接続
 

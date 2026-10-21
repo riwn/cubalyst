@@ -1,0 +1,45 @@
+# 名前（*.server.home.arpa）でアプリを分けて LAN 内に HTTPS で公開する Caddy の設定例
+# （docs/lan.md の「名前で開く」を参照）。443 番の1つで複数のアプリを公開できる。
+#   192.168.1.10 → サーバーの LAN 側の IP アドレス
+#   server       → deploy/dnsmasq-home-arpa.conf で決めた名前
+# /etc/caddy/Caddyfile に置く。アプリを増やすときは、下の cubalyst のようなサイトを足す。
+{
+	# 認証局のルート証明書を、このサーバー自身の信頼ストアには入れない（各端末に入れる）
+	skip_install_trust
+	# IP アドレスで開いたとき（SNI が無いとき）に使う証明書
+	default_sni 192.168.1.10
+	# 80 番（HTTP→HTTPS のリダイレクト）は待ち受けない
+	auto_https disable_redirects
+}
+
+# どのサイトにも共通の設定：LAN 側のアドレスだけで待ち受け、Caddy 自身の認証局で証明書を発行する
+(lan) {
+	bind 192.168.1.10
+	tls internal
+}
+
+# IP アドレスで開いたとき：端末に入れるルート証明書を配る（名前解決の設定前でも取れるように）
+https://192.168.1.10 {
+	import lan
+	handle /caddy-root.crt {
+		# apt で入れた Caddy（caddy ユーザーで動く）の場合のパス
+		root * /var/lib/caddy/.local/share/caddy/pki/authorities/local
+		rewrite * /root.crt
+		header Content-Type application/x-x509-ca-cert
+		file_server
+	}
+	handle {
+		respond "アプリは https://<アプリ名>.server.home.arpa で開いてください。ルート証明書は /caddy-root.crt です。" 404
+	}
+}
+
+https://cubalyst.server.home.arpa {
+	import lan
+	reverse_proxy 127.0.0.1:8090
+}
+
+# 例：ほかのアプリを足すとき
+# https://wiki.server.home.arpa {
+# 	import lan
+# 	reverse_proxy 127.0.0.1:3000
+# }
