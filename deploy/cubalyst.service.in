@@ -1,0 +1,17 @@
+# Cubalyst を常駐させる systemd のユーザーサービス。
+# deploy/install-service.sh が @REPO@ と @ADDR@ を置き換えて
+# ~/.config/systemd/user/cubalyst.service に置く。直接は編集しない。
+[Unit]
+Description=Cubalyst（スマートキューブの記録・解析）
+After=network.target
+
+[Service]
+WorkingDirectory=@REPO@
+# Claude の APIキーなど（無くてもよい）。KEY=VALUE を1行ずつ書く
+EnvironmentFile=-%h/.config/cubalyst/env
+ExecStart=@REPO@/bin/cubalyst -addr @ADDR@
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
