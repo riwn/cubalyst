@@ -1,9 +1,12 @@
 // Command cubalyst はCubalystのローカルサーバーを起動する。
+//
+// `cubalyst mcp` は、動いているサーバーの API を使う MCP サーバーを標準入出力で起動する。
 package main
 
 import (
 	"context"
 	"errors"
+	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -11,9 +14,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
 	"cubalyst/internal/analysis"
 	"cubalyst/internal/config"
 	"cubalyst/internal/db"
+	"cubalyst/internal/mcpserver"
 	"cubalyst/internal/server"
 )
 
@@ -24,6 +30,9 @@ func main() {
 }
 
 func run() error {
+	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		return runMCP(os.Args[2:])
+	}
 	cfg, err := config.Load(os.Args[1:])
 	if err != nil {
 		return err
@@ -81,4 +90,23 @@ func run() error {
 		return srv.Shutdown(shutdownCtx)
 	}
 	return nil
+}
+
+// runMCP は MCP サーバーを標準入出力で動かす。標準出力は MCP の通信に使うので、ログは標準エラーに出す。
+func runMCP(args []string) error {
+	fs := flag.NewFlagSet("cubalyst mcp", flag.ContinueOnError)
+	api := fs.String("api", envOr("CUBALYST_API", "http://127.0.0.1:8090"), "Cubalyst の API の URL")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return mcpserver.New(mcpserver.NewClient(*api)).Run(ctx, &mcp.StdioTransport{})
+}
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }

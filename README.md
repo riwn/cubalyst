@@ -122,6 +122,10 @@ APIキーは [Claude Console](https://platform.claude.com/) で作成できま�
 - 解析に渡したデータ（入力）と結果は `analyses` テーブルに保存され、画面の「入力データ」で確認できます
 - APIキーなしで画面だけ確かめたいときは `CUBALYST_CLAUDE_MOCK=1` で起動すると、決まった文面を返すモックになります（課金なし）
 
+### MCP で解析する（API キーなし）
+
+`cubalyst mcp` を Claude Code や Claude Desktop に MCP サーバーとして登録すると、チャットで Claude にソルブを解析させ、結果をアプリに保存できます。API キーは要らず、Claude のプランの利用枠で動きます。登録のしかたは [docs/mcp.md](docs/mcp.md) にまとめています。
+
 ## 設定
 
 フラグまたは環境変数で指定できます（フラグが優先）。
@@ -158,6 +162,7 @@ internal/solves/       ソルブと段階区切りの保存
 internal/export/       export（JSON / CSV / テキスト）と import
 internal/settings/     設定（クロス色）
 internal/analysis/     Claudeによる解析（入力データの集計・整形、API呼び出し、保存）
+internal/mcpserver/    MCP サーバー（`cubalyst mcp`。HTTP API を呼んでツールとして公開）
 web/                   フロントエンド（Vite + React + TypeScript）
 web/src/cube/          キューブ接続（実機・モック）、状態管理、facelets変換、時計ズレ補正
 web/src/solve/         スクランブル追跡、計測セッション、CFOP段階検出、統計
@@ -190,6 +195,9 @@ data/                  DBファイル置き場（git管理外）
 | GET / POST | `/api/solves/{id}/analyses` | ソルブの解析結果一覧 / 解析の実行 |
 | POST | `/api/analyses/trend` | 傾向分析（`{"mode":"full","limit":50}`） |
 | GET / DELETE | `/api/analyses`, `/api/analyses/{id}` | 解析結果の一覧（`kind=trend`）/ 削除 |
+| POST | `/api/analyses` | アプリの外で書いた解析結果の保存（`{"kind":"solve","solve_id":1,"result":"..."}`、傾向は `"params":{"mode":"full","limit":50}`） |
+| GET | `/api/solves/{id}/analysis-input` | ソルブの解析に渡す入力データ（MCP 用） |
+| GET | `/api/analysis-input/trend` | 傾向分析に渡す入力データ（`mode` `limit`、MCP 用） |
 
 ### ケースのマスタ
 

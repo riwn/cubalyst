@@ -93,8 +93,9 @@ export function AnalysisPanel({
         )}
       </div>
       {status && !status.configured && (
-        <p className="warn small">
-          Claude APIが設定されていません。サーバーを環境変数 <code>ANTHROPIC_API_KEY</code> 付きで起動すると使えます（README参照）。
+        <p className="muted small">
+          この画面から解析するには、サーバーを環境変数 <code>ANTHROPIC_API_KEY</code>{' '}
+          付きで起動します。API キーなしでも、Claude Code や Claude Desktop から MCP（<code>cubalyst mcp</code>）で解析して、ここに保存できます（docs/mcp.md 参照）。
         </p>
       )}
       {status?.configured && !analyzed && (
@@ -108,8 +109,8 @@ export function AnalysisPanel({
           <div className="row muted small">
             <span>
               {formatDate(a.created_at)} ・ {a.model}
-              {a.kind === 'trend' && a.params.limit && ` ・ 直近${a.params.limit}件（${a.params.mode}）`} ・ 入力
-              {a.input_tokens} / 出力{a.output_tokens} tokens
+              {a.kind === 'trend' && a.params.limit && ` ・ 直近${a.params.limit}件（${a.params.mode}）`}
+              {(a.input_tokens > 0 || a.output_tokens > 0) && ` ・ 入力${a.input_tokens} / 出力${a.output_tokens} tokens`}
             </span>
             <span className="spacer" />
             <KebabMenu
