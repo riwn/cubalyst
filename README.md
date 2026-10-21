@@ -1,6 +1,6 @@
 # Cubalyst
 
-GANのスマートキューブ（GAN i4）をPCとBluetoothで接続し、ソルブの記録・統計・再生・練習・LLM解析を行う個人用Webアプリ。
+スマートキューブをPCとBluetoothで接続し、ソルブの記録・統計・再生・練習・LLM解析を行うWebアプリ。各自が自分のPCで動かして使います。
 詳細は [cubalyst-spec.md](cubalyst-spec.md) を参照。
 
 **ローカル起動専用**のアプリです。サーバーは `127.0.0.1` にのみバインドし（ループバック以外を指定すると起動を拒否します）、認証はありません。
@@ -9,66 +9,65 @@ GANのスマートキューブ（GAN i4）をPCとBluetoothで接続し、ソル
 
 - Go 1.24 以上
 - Node.js 22 以上 / npm
-- クライアント側：Chrome または Edge（Web Bluetooth対応ブラウザ）
+- GNU make と bash（`make dev` などで使います）
+- ブラウザ：Chrome または Edge（Web Bluetooth に対応しているもの）
+- Bluetooth が使えるPC（キューブとつなぐのはブラウザを開くPCです）
 
-## 起動方法
+## はじめかた
 
-### なぜSSHポートフォワードが必要か
+```
+git clone https://github.com/riwn/cubalyst.git
+cd cubalyst
+make dev
+```
 
-Web Bluetoothは**セキュアコンテキスト（`localhost` または HTTPS）でしか動きません**。
-サーバー（`nuc`）にLANのIPアドレスでアクセスするとBluetoothが使えないため、WindowsからSSHのポートフォワードで `localhost` として開きます。
+`make dev` は、初回にフロントエンドの依存（`web/node_modules`）を入れてから、GoサーバーとVite devサーバーをまとめて起動します。
+`Local: http://127.0.0.1:5173/` と表示されたら、同じPCのブラウザで <http://localhost:5173> を開きます。Ctrl+C で両方止まります。
 
-### 開発時（Vite devサーバー :5173）
+記録は `data/cubalyst.db`（SQLite）に保存されます。ファイルがなければ起動時に作られます。
 
-1. Windowsからポートフォワードしてnucに入る：
+> `npm install` が `git@github.com: Permission denied (publickey)` で失敗する場合：依存の1つ（smartcube-web-bluetooth）を GitHub から取得しており、`package-lock.json` には SSH の URL で記録されています。GitHub に SSH 鍵を登録していないときは、次を実行してから入れ直すと https で取得します。
+>
+> ```
+> git config --global url."https://github.com/".insteadOf ssh://git@github.com/
+> ```
 
-   ```
-   ssh -L 5173:localhost:5173 nuc
-   ```
+### 起動のしかた
 
-2. そのSSHセッションのまま、nuc上でGoサーバーとVite devサーバーをまとめて起動する：
+| 方法 | コマンド | 開くURL | 用途 |
+|---|---|---|---|
+| 開発用 | `make dev` | <http://localhost:5173> | フロントの変更がすぐ反映される（Viteが `/api` をGoサーバーへ中継） |
+| 本番相当 | `make build` のあと `make run` | <http://localhost:8080> | ビルド済みのフロントもGoサーバーが配信するので、ポートは1つ |
 
-   ```
-   cd ~/work/cubalyst
-   make dev
-   ```
+GoサーバーとViteを別々のターミナルで起動したい場合は、`make dev-server`（Goサーバー :8080）と `make dev-web`（Vite :5173）を使います。
 
-   `Local: http://127.0.0.1:5173/` と表示されたら起動完了です。Ctrl+C で両方止まります。
+### 別のマシンでサーバーを動かす場合
 
-3. Windowsのブラウザで <http://localhost:5173> を開く。
+Web Bluetooth は**セキュアコンテキスト（`localhost` または HTTPS）でしか動きません**。
+サーバーを別のマシン（自宅サーバーやLinuxの開発機など）で動かし、ブラウザからLANのIPアドレスで開くと、Bluetoothが使えません。
+この場合は、ブラウザを開くPCからSSHのポートフォワードで接続し、`localhost` として開きます（`<server>` はサーバーのホスト名です）。
 
-Viteのdevサーバーが `/api` をGoサーバーへプロキシします。
-個別に起動したい場合は `make dev-server`（Goサーバー :8080）と `make dev-web`（Vite :5173）を別々のターミナルで実行します。
+```
+ssh -L 5173:localhost:5173 <server>
+```
 
-> SSHのターミナルに `channel N: open failed: connect failed: Connection refused` と出るのは、nuc側でViteが動いていないときにブラウザがアクセスした場合です。Viteを起動すれば出なくなります（Viteを止めている間は、開いているタブを閉じておくと出ません）。
+そのSSHセッションのまま、サーバー側のリポジトリで `make dev` を実行し、手元のブラウザで <http://localhost:5173> を開きます。
+本番相当で動かすときは、`5173` を `8080` に読み替えてください。
 
-### 本番相当（Goサーバー単体 :8080）
+> SSHのターミナルに `channel N: open failed: connect failed: Connection refused` と出るのは、サーバー側でViteが動いていないときにブラウザがアクセスした場合です。Viteを起動すれば出なくなります（Viteを止めている間は、開いているタブを閉じておくと出ません）。
 
-Goサーバーがビルド済みのフロントエンドも配信するので、ポートは1つで済みます。
-
-1. Windowsからポートフォワードしてnucに入る：
-
-   ```
-   ssh -L 8080:localhost:8080 nuc
-   ```
-
-2. nuc上でビルドして起動する：
-
-   ```
-   make build
-   make run
-   ```
-
-3. Windowsのブラウザで <http://localhost:8080> を開く。
+サーバーは `127.0.0.1` にしか待ち受けないので、ポートフォワードを使わずに他のマシンから直接つなぐことはできません。
 
 ## キューブの接続
 
-タイマー画面の「Connect」を押し、Chromeのデバイス選択でキューブ（GAN i4 など）を選びます。
+タイマー画面の「Connect」を押し、Chromeのデバイス選択でキューブを選びます。
+
+キューブとの通信には [smartcube-web-bluetooth](https://github.com/poliva/smartcube-web-bluetooth) を使っており、GAN / MoYu / QiYi / GiiKER / GoCube のスマートキューブに対応しています。実機で動作を確かめているのは GAN i4 です。
 
 GAN系のキューブは通信の暗号化にMACアドレスを使います。取得方法は次のどちらかです。
 
 - **自動取得（推奨）**：Chromeで `chrome://flags/#enable-experimental-web-platform-features` を有効にして再起動する。キューブのアドバタイズからMACアドレスを読み取ります。
-- **手入力**：自動取得できなかったときは入力欄が出ます。MACアドレスはWindowsの「設定 → Bluetoothとデバイス」や `chrome://bluetooth-internals` で確認できます。入力した値はブラウザに保存され、次回からは聞かれません。
+- **手入力**：自動取得できなかったときは入力欄が出ます。MACアドレスは `chrome://bluetooth-internals` や、OSのBluetooth設定（Windowsなら「設定 → Bluetoothとデバイス」）で確認できます。入力した値はブラウザに保存され、次回からは聞かれません。
 
 接続後は回転・facelets・バッテリーが画面に表示され、3Dキューブが実機に同期します。
 
@@ -98,7 +97,7 @@ GAN系のキューブは通信の暗号化にMACアドレスを使います。�
 
 ### 持ち方と解法の表記
 
-スマートキューブは、キューブ自身の向き（GAN標準配色：白上・緑前）で回転を記録します。設定の「持ち方（下の色・前の色）」に合わせて、
+スマートキューブは、キューブ自身の向き（白上・緑前）で回転を記録します。設定の「持ち方（下の色・前の色）」に合わせて、
 解法の表示・再生（3D表示の向きも）・テキストのリコン・Claudeに渡すデータの記号を読み替えます。
 保存されている回転ログ（JSON export を含む）はキューブ自身の向きのままで、スクランブルは常に白上・緑前（WCA）です。
 
@@ -111,6 +110,8 @@ GAN系のキューブは通信の暗号化にMACアドレスを使います。�
 ```
 ANTHROPIC_API_KEY=sk-ant-... make dev
 ```
+
+APIキーは [Claude Console](https://platform.claude.com/) で作成できます。
 
 - モデルは既定で `claude-opus-5-5`、effort は `high` です（下の環境変数で変更できます）。1回の解析でおおよそ十数円〜数十円のAPI利用料がかかります（使ったトークン数は結果の横に表示されます）
 - 安全分類による拒否に備えて、サーバー側フォールバック（`fallbacks: "default"`）を有効にしています
@@ -140,8 +141,6 @@ Goサーバーのポートを変えた場合は、Vite側にも `CUBALYST_API=ht
 make test    # go vet / go test / フロントの型チェック・lint・vitest
 make clean   # ビルド成果物を削除
 ```
-
-注意：お使いのzshで `make` が関数として定義されていて動かない場合は、`/usr/bin/make test` のようにフルパスで実行してください。
 
 ### ディレクトリ構成
 
@@ -200,3 +199,9 @@ cd web && npm run gen:cases
 
 DBは単一ファイルなので、サーバーを止めてから `data/cubalyst.db` をコピーするだけです。
 （WALモードのため、起動中は `cubalyst.db-wal` / `cubalyst.db-shm` も存在します。停止すると本体ファイルに統合されます。）
+
+## ライセンス
+
+[MIT License](LICENSE) です。
+
+依存しているライブラリやフォントは、それぞれのライセンスに従います。たとえば、cubing.js は MPL-2.0 または GPL-3.0-or-later、同梱しているフォント（Saira Semi Condensed、BIZ UDPゴシック）は SIL Open Font License 1.1 です。
