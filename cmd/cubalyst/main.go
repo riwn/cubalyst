@@ -16,7 +16,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"cubalyst/internal/analysis"
 	"cubalyst/internal/config"
 	"cubalyst/internal/db"
 	"cubalyst/internal/mcpserver"
@@ -55,21 +54,9 @@ func run() error {
 	}
 	log.Printf("db: %s (schema version %d)", cfg.DBPath, v)
 
-	// Claude API（未設定でも起動はする。解析APIだけが使えない）
-	var llm analysis.LLM
-	if os.Getenv("CUBALYST_CLAUDE_MOCK") == "1" {
-		llm = analysis.Mock{}
-		log.Print("claude: mock (CUBALYST_CLAUDE_MOCK=1)")
-	} else if c, err := analysis.NewClaudeFromEnv(); err == nil {
-		llm = c
-		log.Printf("claude: %s", c.Model())
-	} else {
-		log.Printf("claude: disabled (%v)", err)
-	}
-
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           server.New(database, cfg.StaticDir, llm).Handler(),
+		Handler:           server.New(database, cfg.StaticDir).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	errCh := make(chan error, 1)

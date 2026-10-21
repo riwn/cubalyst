@@ -41,6 +41,8 @@ export type Solve = {
   step: string | null
   note: string
   splits?: Split[]
+  /** このソルブを対象にした解析の数（includeAnalyses のときだけ）。 */
+  analyses?: { solve: number; multi: number }
 }
 
 export type NewSolve = Omit<Solve, 'id'>
@@ -56,6 +58,7 @@ export type SolveFilter = {
   offset?: number
   includeMoves?: boolean
   includeSplits?: boolean
+  includeAnalyses?: boolean
   order?: 'asc' | 'desc'
 }
 
@@ -83,7 +86,7 @@ export function filterToQuery(f: SolveFilter): string {
   if (f.ids?.length) q.set('ids', f.ids.join(','))
   if (f.limit !== undefined) q.set('limit', String(f.limit))
   if (f.offset) q.set('offset', String(f.offset))
-  const include = [f.includeMoves && 'moves', f.includeSplits && 'splits'].filter(Boolean)
+  const include = [f.includeMoves && 'moves', f.includeSplits && 'splits', f.includeAnalyses && 'analyses'].filter(Boolean)
   if (include.length) q.set('include', include.join(','))
   if (f.order) q.set('order', f.order)
   return q.toString()
@@ -158,39 +161,33 @@ export function listCases(): Promise<CaseInfo[]> {
   return request('/api/cases')
 }
 
+export type AnalysisKind = 'solve' | 'multi'
+
+/** 解析結果。単体（solve）は1回のソルブ、まとめ（multi）は複数のソルブを対象にする。解析は MCP 経由の Claude が書く。 */
 export type Analysis = {
   id: number
-  kind: 'solve' | 'trend'
-  solve_id: number | null
-  params: { mode?: SolveMode; limit?: number }
+  kind: AnalysisKind
+  /** まとめの見出し（単体は空）。 */
+  title: string
+  params: Record<string, unknown>
+  /** 対象のソルブ（古い順。消されたソルブは含まない）。 */
+  solve_ids: number[]
   input: string
   result: string
   model: string
-  input_tokens: number
-  output_tokens: number
   created_at: string
 }
 
-export type AnalysisStatus = { configured: boolean; model: string; message?: string }
-
-export function getAnalysisStatus(): Promise<AnalysisStatus> {
-  return request('/api/analysis/status')
+export function listAnalyses(f: { kind?: AnalysisKind; solve_id?: number; limit?: number } = {}): Promise<Analysis[]> {
+  const q = new URLSearchParams()
+  if (f.kind) q.set('kind', f.kind)
+  if (f.solve_id) q.set('solve_id', String(f.solve_id))
+  q.set('limit', String(f.limit ?? 0))
+  return request(`/api/analyses?${q}`)
 }
 
-export function analyzeSolve(id: number): Promise<Analysis> {
-  return request(`/api/solves/${id}/analyses`, { method: 'POST' })
-}
-
-export function listSolveAnalyses(id: number): Promise<Analysis[]> {
-  return request(`/api/solves/${id}/analyses`)
-}
-
-export function analyzeTrend(mode: SolveMode, limit: number): Promise<Analysis> {
-  return request('/api/analyses/trend', { method: 'POST', body: JSON.stringify({ mode, limit }) })
-}
-
-export function listTrendAnalyses(limit = 10): Promise<Analysis[]> {
-  return request(`/api/analyses?kind=trend&limit=${limit}`)
+export function getAnalysis(id: number): Promise<Analysis> {
+  return request(`/api/analyses/${id}`)
 }
 
 export function deleteAnalysis(id: number): Promise<void> {

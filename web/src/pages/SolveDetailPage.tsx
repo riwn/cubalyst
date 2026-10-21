@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import {
-  analyzeSolve,
   deleteSolve,
   exportUrl,
   getSolve,
-  listSolveAnalyses,
+  listAnalyses,
   replaceSplits,
   updateSolve,
+  type Analysis,
   type Solve,
 } from '../api'
-import { AnalysisPanel } from '../components/AnalysisPanel'
+import { AnalysisCard, AnalysisHowTo } from '../components/AnalysisCard'
 import { StepShareDonut } from '../components/charts'
 import { ConfirmDialog } from '../ui/Dialog'
 import { KebabMenu } from '../ui/Popover'
@@ -153,14 +153,61 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
 
       {message && <p className="muted">{message}</p>}
 
-      <AnalysisPanel
-        title="Claudeによる解析"
-        runLabel="このソルブを解析"
-        load={() => listSolveAnalyses(solve.id)}
-        run={() => analyzeSolve(solve.id)}
-        reloadKey={solve.id}
-        confirmRerun
-      />
+      <SolveAnalyses solveId={solve.id} />
     </div>
+  )
+}
+
+/** このソルブの単体の解析と、このソルブを含むまとめ解析へのリンク。 */
+function SolveAnalyses({ solveId }: { solveId: number }) {
+  const [list, setList] = useState<Analysis[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    listAnalyses({ solve_id: solveId })
+      .then((l) => !cancelled && setList(l))
+      .catch((err: unknown) => !cancelled && setError(String(err)))
+    return () => {
+      cancelled = true
+    }
+  }, [solveId])
+
+  const singles = list.filter((a) => a.kind === 'solve')
+  const multis = list.filter((a) => a.kind === 'multi')
+  return (
+    <section className="panel analysis-panel">
+      <h3>解析</h3>
+      {error && <p className="error">{error}</p>}
+      {singles.length === 0 && (
+        <>
+          <p className="muted">このソルブの単体の解析はまだありません</p>
+          <AnalysisHowTo />
+        </>
+      )}
+      {singles.map((a) => (
+        <AnalysisCard
+          key={a.id}
+          a={a}
+          showTarget={false}
+          onDeleted={(d) => setList((prev) => prev.filter((x) => x.id !== d.id))}
+        />
+      ))}
+      {multis.length > 0 && (
+        <div className="analysis-multis">
+          <h4>このソルブを含むまとめ解析</h4>
+          <ul>
+            {multis.map((a) => (
+              <li key={a.id}>
+                <Link to={`/analyses/${a.id}`}>
+                  {a.title || 'まとめ'}（{a.solve_ids.length}件）
+                </Link>{' '}
+                <span className="muted small">{formatDate(a.created_at)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   )
 }

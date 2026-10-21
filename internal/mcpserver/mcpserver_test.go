@@ -32,7 +32,7 @@ func connect(t *testing.T, solves ...string) (*mcp.ClientSession, string) {
 	if err := db.Migrate(ctx, database); err != nil {
 		t.Fatal(err)
 	}
-	api := httptest.NewServer(server.New(database, t.TempDir(), nil).Handler())
+	api := httptest.NewServer(server.New(database, t.TempDir()).Handler())
 	t.Cleanup(api.Close)
 	for _, s := range solves {
 		res, err := http.Post(api.URL+"/api/solves", "application/json", strings.NewReader(s))
@@ -71,68 +71,75 @@ func call(t *testing.T, cs *mcp.ClientSession, name string, args map[string]any)
 }
 
 func TestTools(t *testing.T) {
-	cs, _ := connect(t, solve, solve)
-	if !strings.Contains(cs.InitializeResult().Instructions, "コーチ") {
-		t.Fatalf("instructions: %q", cs.InitializeResult().Instructions)
+	cs, _ := connect(t, solve, solve, solve)
+	if ins := cs.InitializeResult().Instructions; !strings.Contains(ins, "コーチ") || !strings.Contains(ins, "kind=multi") {
+		t.Fatalf("instructions: %q", ins)
 	}
 
 	out, isErr := call(t, cs, "list_solves", nil)
-	if isErr || !strings.Contains(out, "全2件") || !strings.Contains(out, "#2") || !strings.Contains(out, "3.00  3手  Cross 1.00 / F2L 2.00") ||
-		!strings.Contains(out, "最後の傾向分析: まだなし") || strings.Count(out, "未解析") != 2 {
+	if isErr || !strings.Contains(out, "全3件") || !strings.Contains(out, "#3") || !strings.Contains(out, "3.00  3手  Cross 1.00 / F2L 2.00") ||
+		!strings.Contains(out, "最後のまとめ解析: まだなし") || strings.Count(out, "単体は未解析") != 3 {
 		t.Fatalf("list_solves: %s", out)
 	}
 
+	// 単体
 	out, isErr = call(t, cs, "get_solve", nil)
-	if isErr || !strings.Contains(out, "ソルブ #2 の解析用データ") || !strings.Contains(out, "| Cross |") {
+	if isErr || !strings.Contains(out, "ソルブ #3 の単体解析用データ") || !strings.Contains(out, "| Cross |") || !strings.Contains(out, "kind=solve, solve_id=3") {
 		t.Fatalf("get_solve latest: %s", out)
 	}
 	if out, isErr = call(t, cs, "get_solve", map[string]any{"solve_id": 99}); !isErr || !strings.Contains(out, "not found") {
 		t.Fatalf("get_solve missing: %s", out)
 	}
-
-	out, isErr = call(t, cs, "get_trend", map[string]any{"limit": 10})
-	if isErr || !strings.Contains(out, "直近10件（full）") {
-		t.Fatalf("get_trend: %s", out)
-	}
-
 	out, isErr = call(t, cs, "save_analysis", map[string]any{"kind": "solve", "solve_id": 1, "result": "## 結論\nクロスが長い"})
-	if isErr || !strings.Contains(out, "解析 #1") || !strings.Contains(out, "/history/1") {
+	if isErr || !strings.Contains(out, "解析 #1（単体：ソルブ #1）") || !strings.Contains(out, "/analyses/1") {
 		t.Fatalf("save solve: %s", out)
 	}
-	out, isErr = call(t, cs, "save_analysis", map[string]any{"kind": "trend", "limit": 10, "result": "傾向", "model": "Claude Opus 5.5"})
-	if isErr || !strings.Contains(out, "統計画面") {
-		t.Fatalf("save trend: %s", out)
+
+	// まとめ：対象のソルブの ID を受け取り、そのまま保存する
+	out, isErr = call(t, cs, "get_solves", map[string]any{"limit": 2, "title": "直近2件"})
+	if isErr || !strings.Contains(out, "まとめ解析用データ「直近2件」（2件）") || !strings.Contains(out, "solve_ids=[2,3]") {
+		t.Fatalf("get_solves: %s", out)
+	}
+	if out, isErr = call(t, cs, "get_solves", map[string]any{"solve_ids": []int{1, 3}}); isErr || !strings.Contains(out, "solve_ids=[1,3]") {
+		t.Fatalf("get_solves by ids: %s", out)
+	}
+	if out, isErr = call(t, cs, "get_solves", map[string]any{"from": "2026-10-21", "to": "2026-10-22"}); isErr || !strings.Contains(out, "（3件）") {
+		t.Fatalf("get_solves by date: %s", out)
+	}
+	out, isErr = call(t, cs, "save_analysis", map[string]any{"kind": "multi", "solve_ids": []int{2, 3}, "title": "直近2件", "result": "傾向", "model": "Claude Opus 5.5"})
+	if isErr || !strings.Contains(out, "まとめ「直近2件」：2件 #2 #3") {
+		t.Fatalf("save multi: %s", out)
+	}
+	if out, isErr = call(t, cs, "save_analysis", map[string]any{"kind": "multi", "solve_ids": []int{2}, "result": "x"}); !isErr || !strings.Contains(out, "kind=solve") {
+		t.Fatalf("save multi with one solve: %s", out)
 	}
 	if out, isErr = call(t, cs, "save_analysis", map[string]any{"kind": "solve", "solve_id": 1, "result": ""}); !isErr {
 		t.Fatalf("save empty: %s", out)
 	}
 
-	// 解析済みかどうかと、最後の傾向分析が一覧に出る
+	// 一覧に、単体の解析済みか・まとめに含まれるかと、最後のまとめ解析が出る
 	out, _ = call(t, cs, "list_solves", nil)
-	lines := strings.Split(out, "\n")
-	if !strings.Contains(out, `最後の傾向分析: `) || !strings.Contains(out, `"limit":10`) {
-		t.Fatalf("list_solves trend: %s", out)
+	if !strings.Contains(out, "最後のまとめ解析: 「直近2件」") {
+		t.Fatalf("list_solves multi: %s", out)
 	}
-	var solve1, solve2 string
-	for _, l := range lines {
-		switch {
-		case strings.HasPrefix(l, "#1 "):
-			solve1 = l
-		case strings.HasPrefix(l, "#2 "):
-			solve2 = l
+	lines := map[string]string{}
+	for _, l := range strings.Split(out, "\n") {
+		if id, _, ok := strings.Cut(l, " "); ok && strings.HasPrefix(id, "#") {
+			lines[id] = l
 		}
 	}
-	if !strings.Contains(solve1, "解析済み（1回") || !strings.Contains(solve2, "未解析") {
-		t.Fatalf("list_solves analyzed marks:\n%s", out)
+	if !strings.Contains(lines["#1"], "単体解析済み（1回）") || strings.Contains(lines["#1"], "まとめ") ||
+		!strings.Contains(lines["#3"], "単体は未解析") || !strings.Contains(lines["#3"], "まとめ解析に1件含まれる") {
+		t.Fatalf("list_solves marks:\n%s", out)
 	}
 
 	out, _ = call(t, cs, "list_analyses", map[string]any{"solve_id": 1})
-	if !strings.Contains(out, "ソルブ #1") || !strings.Contains(out, "Claude（MCP）") || strings.Contains(out, "傾向") {
+	if !strings.Contains(out, "単体：ソルブ #1") || !strings.Contains(out, "Claude（MCP）") || strings.Contains(out, "まとめ") {
 		t.Fatalf("list_analyses solve: %s", out)
 	}
-	out, _ = call(t, cs, "list_analyses", map[string]any{"kind": "trend"})
-	if !strings.Contains(out, `"limit":10`) || !strings.Contains(out, "Claude Opus 5.5") {
-		t.Fatalf("list_analyses trend: %s", out)
+	out, _ = call(t, cs, "list_analyses", map[string]any{"kind": "multi"})
+	if !strings.Contains(out, "まとめ「直近2件」") || !strings.Contains(out, "Claude Opus 5.5") {
+		t.Fatalf("list_analyses multi: %s", out)
 	}
 }
 
@@ -170,11 +177,11 @@ func TestPrompts(t *testing.T) {
 	if tc := res.Messages[0].Content.(*mcp.TextContent); !strings.Contains(tc.Text, "ソルブ #7") || !strings.Contains(tc.Text, "save_analysis") {
 		t.Fatalf("analyze_solve: %s", tc.Text)
 	}
-	res, err = cs.GetPrompt(context.Background(), &mcp.GetPromptParams{Name: "analyze_trend"})
+	res, err = cs.GetPrompt(context.Background(), &mcp.GetPromptParams{Name: "analyze_recent"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tc := res.Messages[0].Content.(*mcp.TextContent); !strings.Contains(tc.Text, "直近50件") {
-		t.Fatalf("analyze_trend: %s", tc.Text)
+	if tc := res.Messages[0].Content.(*mcp.TextContent); !strings.Contains(tc.Text, "直近20件") || !strings.Contains(tc.Text, "kind=multi") {
+		t.Fatalf("analyze_recent: %s", tc.Text)
 	}
 }

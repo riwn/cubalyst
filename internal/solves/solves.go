@@ -63,6 +63,14 @@ type Solve struct {
 	Step     *string   `json:"step"`
 	Note     string    `json:"note"`
 	Splits   []Split   `json:"splits,omitempty"`
+	// Analyses はこのソルブを対象にした解析の数（一覧で include=analyses のときだけ）。
+	Analyses *AnalysisCounts `json:"analyses,omitempty"`
+}
+
+// AnalysisCounts はソルブを対象にした解析の数（単体・まとめ）。
+type AnalysisCounts struct {
+	Solve int `json:"solve"`
+	Multi int `json:"multi"`
 }
 
 // Validate は保存前の値を検証する。
@@ -278,6 +286,8 @@ type Filter struct {
 	IncludeMoves bool
 	// IncludeSplits が true の場合、Splits も読み込む。
 	IncludeSplits bool
+	// IncludeAnalyses が true の場合、Analyses（解析の数）も読み込む。
+	IncludeAnalyses bool
 	// Ascending が true なら古い順、false なら新しい順。
 	Ascending bool
 }
@@ -362,7 +372,43 @@ func (st *Store) List(ctx context.Context, f Filter) ([]Solve, int, error) {
 			return nil, 0, err
 		}
 	}
+	if f.IncludeAnalyses {
+		if err := st.loadAnalysisCounts(ctx, out); err != nil {
+			return nil, 0, err
+		}
+	}
 	return out, total, nil
+}
+
+// loadAnalysisCounts はソルブごとの解析の数を読み込む。
+func (st *Store) loadAnalysisCounts(ctx context.Context, list []Solve) error {
+	if len(list) == 0 {
+		return nil
+	}
+	idx := map[int64]int{}
+	args := make([]any, len(list))
+	for i, s := range list {
+		idx[s.ID] = i
+		args[i] = s.ID
+		list[i].Analyses = &AnalysisCounts{}
+	}
+	rows, err := st.db.QueryContext(ctx, `SELECT l.solve_id, SUM(a.kind = 'solve'), SUM(a.kind = 'multi')
+		FROM analysis_solves l JOIN analyses a ON a.id = l.analysis_id
+		WHERE l.solve_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(list)), ",")+`)
+		GROUP BY l.solve_id`, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var c AnalysisCounts
+		if err := rows.Scan(&id, &c.Solve, &c.Multi); err != nil {
+			return err
+		}
+		*list[idx[id]].Analyses = c
+	}
+	return rows.Err()
 }
 
 // Get は1件取得する。

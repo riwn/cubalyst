@@ -3,68 +3,25 @@ package server
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"cubalyst/internal/analysis"
 	"cubalyst/internal/solves"
 )
 
-type analysisStatus struct {
-	Configured bool   `json:"configured"`
-	Model      string `json:"model"`
-	Message    string `json:"message,omitempty"`
+// 解析は MCP 経由の Claude が行う。サーバーは入力データを渡し、書かれた結果を保存する。
+
+type analysisInput struct {
+	Input    string  `json:"input"`
+	System   string  `json:"system"`
+	Request  string  `json:"request"`
+	SolveIDs []int64 `json:"solve_ids"`
+	Title    string  `json:"title,omitempty"`
 }
 
-func (s *Server) handleAnalysisStatus(w http.ResponseWriter, r *http.Request) {
-	ok, model := s.analysis.Configured()
-	st := analysisStatus{Configured: ok, Model: model}
-	if !ok {
-		st.Message = analysis.ErrNotConfigured.Error()
-	}
-	writeJSON(w, http.StatusOK, st)
-}
-
-func (s *Server) handleAnalyzeSolve(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
-	if !ok {
-		return
-	}
-	a, err := s.analysis.AnalyzeSolve(r.Context(), id)
-	if err != nil {
-		writeAnalysisError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, a)
-}
-
-func (s *Server) handleListSolveAnalyses(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
-	if !ok {
-		return
-	}
-	list, err := s.analysis.List(r.Context(), "", id, 0)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, list)
-}
-
-func (s *Server) handleAnalyzeTrend(w http.ResponseWriter, r *http.Request) {
-	in := analysis.TrendParams{Mode: solves.ModeFull, Limit: 50}
-	if err := decodeJSON(r, &in); err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	a, err := s.analysis.AnalyzeTrend(r.Context(), in)
-	if err != nil {
-		writeAnalysisError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, a)
-}
-
-// handleSolveAnalysisInput は単一ソルブの解析に渡す入力データを返す（MCP 経由で Claude が読む）。
+// handleSolveAnalysisInput は単一ソルブの解析に渡す入力データを返す。
 func (s *Server) handleSolveAnalysisInput(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r)
 	if !ok {
@@ -75,70 +32,97 @@ func (s *Server) handleSolveAnalysisInput(w http.ResponseWriter, r *http.Request
 		writeAnalysisError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, analysisInput{Input: input, System: analysis.SystemPrompt, Request: analysis.SolveRequest})
+	writeJSON(w, http.StatusOK, analysisInput{Input: input, System: analysis.SystemPrompt, Request: analysis.SolveRequest, SolveIDs: []int64{id}})
 }
 
-// handleTrendAnalysisInput は直近N件の傾向分析に渡す入力データを返す。
-func (s *Server) handleTrendAnalysisInput(w http.ResponseWriter, r *http.Request) {
-	p := analysis.TrendParams{Mode: r.URL.Query().Get("mode"), Limit: 50}
-	if v := r.URL.Query().Get("limit"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, errors.New("limit must be an integer"))
-			return
-		}
-		p.Limit = n
-	}
-	input, p, err := s.analysis.TrendInput(r.Context(), p)
+// handleMultiAnalysisInput はまとめ解析に渡す入力データを返す。
+//
+//	ids: カンマ区切り（指定したらそれだけ）/ mode, from, to, limit: 一覧と同じ / title: 見出し
+func (s *Server) handleMultiAnalysisInput(w http.ResponseWriter, r *http.Request) {
+	sel, err := parseSelection(r.URL.Query())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, analysisInput{Input: input, System: analysis.SystemPrompt, Request: analysis.TrendRequest, Params: &p})
+	m, err := s.analysis.MultiInput(r.Context(), sel, strings.TrimSpace(r.URL.Query().Get("title")))
+	if err != nil {
+		writeAnalysisError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, analysisInput{Input: m.Input, System: analysis.SystemPrompt, Request: analysis.MultiRequest, SolveIDs: m.SolveIDs, Title: m.Title})
 }
 
-type analysisInput struct {
-	Input   string                `json:"input"`
-	System  string                `json:"system"`
-	Request string                `json:"request"`
-	Params  *analysis.TrendParams `json:"params,omitempty"`
+func parseSelection(q url.Values) (analysis.Selection, error) {
+	// 期間・ID・件数の書式は一覧と同じ
+	f, err := parseFilter(q)
+	if err != nil {
+		return analysis.Selection{}, err
+	}
+	sel := analysis.Selection{IDs: f.IDs, Mode: f.Mode, From: f.From, To: f.To}
+	if q.Get("limit") != "" {
+		sel.Limit = f.Limit
+	}
+	return sel, nil
 }
 
-// handleSaveAnalysis はアプリの外で書いた解析結果を保存する。
+// handleSaveAnalysis は Claude が書いた解析結果を保存する。
 func (s *Server) handleSaveAnalysis(w http.ResponseWriter, r *http.Request) {
-	var in analysis.ExternalResult
+	var in analysis.SaveRequest
 	if err := decodeJSON(r, &in); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	a, err := s.analysis.SaveExternal(r.Context(), in)
+	a, err := s.analysis.Save(r.Context(), in)
 	if err != nil {
-		if errors.Is(err, solves.ErrNotFound) {
-			writeError(w, http.StatusNotFound, err)
-		} else {
-			writeError(w, http.StatusBadRequest, err)
-		}
+		writeAnalysisError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, a)
 }
 
+// handleListAnalyses は解析結果の一覧を返す（kind=solve|multi、solve_id、limit）。
 func (s *Server) handleListAnalyses(w http.ResponseWriter, r *http.Request) {
-	limit := 20
-	if v := r.URL.Query().Get("limit"); v != "" {
+	q := r.URL.Query()
+	f := analysis.ListFilter{Kind: q.Get("kind"), Limit: 20}
+	if f.Kind != "" && f.Kind != analysis.KindSolve && f.Kind != analysis.KindMulti {
+		writeError(w, http.StatusBadRequest, errors.New("kind must be solve or multi"))
+		return
+	}
+	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 0 {
 			writeError(w, http.StatusBadRequest, errors.New("limit must be a non-negative integer"))
 			return
 		}
-		limit = n
+		f.Limit = n
 	}
-	list, err := s.analysis.List(r.Context(), r.URL.Query().Get("kind"), 0, limit)
+	if v := q.Get("solve_id"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n <= 0 {
+			writeError(w, http.StatusBadRequest, errors.New("solve_id must be a positive integer"))
+			return
+		}
+		f.SolveID = n
+	}
+	list, err := s.analysis.List(r.Context(), f)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
+}
+
+func (s *Server) handleGetAnalysis(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	a, err := s.analysis.Get(r.Context(), id)
+	if err != nil {
+		writeAnalysisError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, a)
 }
 
 func (s *Server) handleDeleteAnalysis(w http.ResponseWriter, r *http.Request) {
@@ -155,11 +139,9 @@ func (s *Server) handleDeleteAnalysis(w http.ResponseWriter, r *http.Request) {
 
 func writeAnalysisError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, analysis.ErrNotConfigured):
-		writeError(w, http.StatusServiceUnavailable, err)
 	case errors.Is(err, solves.ErrNotFound), errors.Is(err, analysis.ErrNotFound):
 		writeError(w, http.StatusNotFound, err)
 	default:
-		writeError(w, http.StatusBadGateway, err)
+		writeError(w, http.StatusBadRequest, err)
 	}
 }

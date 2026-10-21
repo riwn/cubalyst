@@ -300,9 +300,23 @@ func recentStageAverages(list []solves.Solve) string {
 	return stageTable(agg)
 }
 
-// TrendInput は傾向分析の入力。list は古い順。
-func TrendInput(list []solves.Solve, mode string, st settings.Settings) string {
+// MultiInput は複数ソルブをまとめた解析の入力。list は古い順。
+func MultiInput(list []solves.Solve, title string, st settings.Settings) string {
 	crossColor := st.CrossColor
+	modes := map[string]bool{}
+	ids := make([]string, len(list))
+	for i, s := range list {
+		modes[s.Mode] = true
+		ids[i] = fmt.Sprintf("#%d", s.ID)
+	}
+	mode := ""
+	for m := range modes {
+		if mode != "" {
+			mode = "混在"
+			break
+		}
+		mode = m
+	}
 	var b strings.Builder
 	times := make([]int64, len(list))
 	dnf := 0
@@ -312,7 +326,8 @@ func TrendInput(list []solves.Solve, mode string, st settings.Settings) string {
 			dnf++
 		}
 	}
-	fmt.Fprintf(&b, "# 傾向分析の対象\n- 種類: %s\n- 件数: %d（DNF %d）\n- クロス色: %s\n", mode, len(list), dnf, crossColor)
+	fmt.Fprintf(&b, "# まとめ解析の対象（%s）\n- 種類: %s\n- 件数: %d（DNF %d）\n- 対象のソルブ: %s\n- クロス色: %s\n",
+		title, mode, len(list), dnf, strings.Join(ids, " "), crossColor)
 	if len(list) > 0 {
 		fmt.Fprintf(&b, "- 期間: %s 〜 %s\n", list[0].SolvedAt.Format("2006-01-02"), list[len(list)-1].SolvedAt.Format("2006-01-02"))
 	}
@@ -347,7 +362,7 @@ func TrendInput(list []solves.Solve, mode string, st settings.Settings) string {
 	} else if len(list) > 0 {
 		b.WriteString("\n（段階の記録はありません）\n")
 	}
-	if mode == solves.ModeCase {
+	if modes[solves.ModeCase] {
 		fmt.Fprintf(&b, "\n## ケース別\n%s", caseTable(list))
 	}
 	return b.String()

@@ -59,16 +59,17 @@ func (s *Server) handleListSolves(w http.ResponseWriter, r *http.Request) {
 //	from, to: RFC3339 または YYYY-MM-DD（to は排他的）
 //	ids: カンマ区切り
 //	limit: 既定50、0で無制限 / offset
-//	include=moves,splits: 回転ログ・段階も返す / order=asc: 古い順
+//	include=moves,splits,analyses: 回転ログ・段階・解析の数も返す / order=asc: 古い順
 func parseFilter(q url.Values) (solves.Filter, error) {
 	f := solves.Filter{
-		Mode:          q.Get("mode"),
-		CaseID:        q.Get("case_id"),
-		Step:          q.Get("step"),
-		Limit:         defaultListLimit,
-		IncludeMoves:  hasInclude(q, "moves"),
-		IncludeSplits: hasInclude(q, "splits"),
-		Ascending:     q.Get("order") == "asc",
+		Mode:            q.Get("mode"),
+		CaseID:          q.Get("case_id"),
+		Step:            q.Get("step"),
+		Limit:           defaultListLimit,
+		IncludeMoves:    hasInclude(q, "moves"),
+		IncludeSplits:   hasInclude(q, "splits"),
+		IncludeAnalyses: hasInclude(q, "analyses"),
+		Ascending:       q.Get("order") == "asc",
 	}
 	var err error
 	if f.From, err = parseTimeParam(q.Get("from")); err != nil {

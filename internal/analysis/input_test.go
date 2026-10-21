@@ -83,7 +83,7 @@ func TestSolveInput(t *testing.T) {
 	}
 }
 
-func TestTrendInput(t *testing.T) {
+func TestMultiInput(t *testing.T) {
 	var list []solves.Solve
 	for i := range 12 {
 		s := fullSolve(int64(i+1), 1+float64(12-i)/10)
@@ -92,10 +92,10 @@ func TestTrendInput(t *testing.T) {
 		}
 		list = append(list, s)
 	}
-	in := TrendInput(list, "full", settings.Defaults)
+	in := MultiInput(list, "直近", settings.Defaults)
 	for _, want := range []string{"件数: 12（DNF 1）", "現在の ao5", "## 段階別（11ソルブの平均）", "## 前半", "## 後半", "最も時間を使った段階", "F2L: 11件"} {
 		if !strings.Contains(in, want) {
-			t.Errorf("TrendInput missing %q\n%s", want, in)
+			t.Errorf("MultiInput missing %q\n%s", want, in)
 		}
 	}
 }

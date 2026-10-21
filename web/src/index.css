@@ -994,6 +994,70 @@ button.on-accent {
   padding-top: 8px;
 }
 
+.analysis-head {
+  gap: 6px 10px;
+}
+
+/* 解析の種類の印：単体は塗り、まとめは枠 */
+.kind-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.kind-badge--solve {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.kind-badge--multi {
+  background: var(--surface);
+}
+
+a.kind-badge:hover {
+  opacity: 0.8;
+}
+
+.analysis-marks {
+  white-space: nowrap;
+}
+
+.analysis-marks .kind-badge + .kind-badge {
+  margin-left: 4px;
+}
+
+.markdown--collapsed {
+  max-height: 11em;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 60%, transparent);
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.analysis-multis h4 {
+  margin: 12px 0 4px;
+  font-size: 0.9rem;
+}
+
+.analysis-multis ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
 .analysis-input {
   max-height: 320px;
   overflow: auto;
