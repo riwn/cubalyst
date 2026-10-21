@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"cubalyst/internal/notation"
 	"cubalyst/internal/solves"
 )
 
@@ -120,18 +121,38 @@ func FormatTime(ms int64) string {
 }
 
 // WriteText はリコンストラクション形式（スクランブル＋段階ごとの解法＋タイム）で書き出す。
-func WriteText(w io.Writer, list []solves.Solve, loc *time.Location) error {
+// 解法の記号は frame（解く人の持ち方）に合わせて変換する。スクランブルはWCAの向き（白上・緑前）のまま。
+func WriteText(w io.Writer, list []solves.Solve, loc *time.Location, frame notation.Frame, holdDesc string) error {
+	if holdDesc != "" {
+		if _, err := fmt.Fprintf(w, "# 解法の表記：持ち方 %s ／ スクランブル：白上・緑前\n\n", holdDesc); err != nil {
+			return err
+		}
+	}
 	for i, s := range list {
 		if i > 0 {
 			if _, err := io.WriteString(w, "\n"); err != nil {
 				return err
 			}
 		}
-		if _, err := io.WriteString(w, Reconstruction(s, loc)); err != nil {
+		if _, err := io.WriteString(w, Reconstruction(WithFrame(s, frame), loc)); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// WithFrame は回転ログの記号を持ち方での記号に変換したコピーを返す（スクランブルは変えない）。
+func WithFrame(s solves.Solve, frame notation.Frame) solves.Solve {
+	if frame == nil {
+		return s
+	}
+	moves := make([]solves.Move, len(s.Moves))
+	for i, m := range s.Moves {
+		m.Move = frame.Move(m.Move)
+		moves[i] = m
+	}
+	s.Moves = moves
+	return s
 }
 
 // Reconstruction は1ソルブ分のテキスト。

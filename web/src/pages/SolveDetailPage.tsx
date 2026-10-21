@@ -14,7 +14,8 @@ import { AnalysisPanel } from '../components/AnalysisPanel'
 import { SplitsTable } from '../components/SplitsTable'
 import { useCubeStore } from '../cube/hooks'
 import { ReplayPlayer } from '../replay/ReplayPlayer'
-import { useSettings } from '../settings/hooks'
+import { convertMove } from '../cube/orientation'
+import { useHoldFrame, useSettings } from '../settings/hooks'
 import { computeSplits, COLOR_LABELS } from '../solve/cfop'
 import { effectiveTime, formatTime, type Penalty } from '../solve/stats'
 import { formatDate, MODE_LABELS } from '../format'
@@ -45,6 +46,7 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
   const navigate = useNavigate()
   const store = useCubeStore()
   const { settings } = useSettings()
+  const frame = useHoldFrame()
   const [note, setNote] = useState(solve.note)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -103,7 +105,7 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
       </section>
 
       <section className="panel">
-        <h3>スクランブル</h3>
+        <h3>スクランブル（白上・緑前）</h3>
         <p className="alg">{solve.scramble}</p>
       </section>
 
@@ -114,7 +116,7 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
         </div>
         <SplitsTable splits={solve.splits ?? []} moves={moves} totalMs={solve.total_ms} />
         {(solve.splits ?? []).length === 0 && moves.length > 0 && (
-          <p className="alg">{moves.map((m) => m.move).join(' ')}</p>
+          <p className="alg">{moves.map((m) => convertMove(frame, m.move)).join(' ')}</p>
         )}
       </section>
 

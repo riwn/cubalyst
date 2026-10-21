@@ -5,7 +5,7 @@ import { patternToFacelets } from '../cube/facelets'
 import type { CrossColor } from '../solve/cfop'
 
 /** 持ち替え24通り。 */
-const ROTATIONS: string[] = (() => {
+export const ROTATIONS: string[] = (() => {
   const ups = ['', 'x', 'x2', "x'", 'z', "z'"]
   const ys = ['', 'y', 'y2', "y'"]
   return ups.flatMap((u) => ys.map((y) => `${u} ${y}`.trim()))

@@ -115,6 +115,9 @@ export function replaceSplits(id: number, splits: Split[]): Promise<Solve> {
 
 export type Settings = {
   cross_color: CrossColor
+  /** 解くときの持ち方（下の色・前の色）。解法の表記をこの向きに合わせる。 */
+  hold_bottom: CrossColor
+  hold_front: CrossColor
 }
 
 export function getSettings(): Promise<Settings> {

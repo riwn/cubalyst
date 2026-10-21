@@ -86,7 +86,11 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	case "csv":
 		err, contentType, ext = export.WriteCSV(&buf, list), "text/csv", "csv"
 	case "txt":
-		err, contentType, ext = export.WriteText(&buf, list, time.Local), "text/plain", "txt"
+		var st settings.Settings
+		if st, err = s.settings.Get(r.Context()); err == nil {
+			err = export.WriteText(&buf, list, time.Local, st.Frame(), st.HoldDescription())
+		}
+		contentType, ext = "text/plain", "txt"
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Errorf("unknown format %q", format))
 		return

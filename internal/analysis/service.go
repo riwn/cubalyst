@@ -72,7 +72,7 @@ func (s *Service) AnalyzeSolve(ctx context.Context, id int64) (Analysis, error) 
 	if err != nil {
 		return Analysis{}, err
 	}
-	input := SolveInput(solve, recent, st.CrossColor)
+	input := SolveInput(solve, recent, st)
 	prompt := input + "\n\nこのソルブを解析し、改善点をコメントしてください。"
 	return s.run(ctx, "solve", &id, json.RawMessage(`{}`), input, prompt)
 }
@@ -103,7 +103,7 @@ func (s *Service) AnalyzeTrend(ctx context.Context, p TrendParams) (Analysis, er
 	if err != nil {
 		return Analysis{}, err
 	}
-	input := TrendInput(list, p.Mode, st.CrossColor)
+	input := TrendInput(list, p.Mode, st)
 	prompt := input + "\n\nこの傾向を分析し、伸びしろの大きい段階と、これからの練習方針を提案してください。"
 	params, _ := json.Marshal(p)
 	return s.run(ctx, "trend", nil, params, input, prompt)

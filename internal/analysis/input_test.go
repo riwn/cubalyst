@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"cubalyst/internal/settings"
 	"cubalyst/internal/solves"
 )
 
@@ -69,10 +70,12 @@ func fullSolve(id int64, scale float64) solves.Solve {
 
 func TestSolveInput(t *testing.T) {
 	s := fullSolve(7, 1)
-	in := SolveInput(s, []solves.Solve{fullSolve(1, 1), fullSolve(2, 2)}, "white")
+	// キューブ自身の向き（黄を下・緑を前）＝変換なし
+	in := SolveInput(s, []solves.Solve{fullSolve(1, 1), fullSolve(2, 2)},
+		settings.Settings{CrossColor: "white", HoldBottom: "yellow", HoldFront: "green"})
 	for _, want := range []string{
 		"#7", "クロス色: white", "| Cross |", "| F2L 2 | 0.80 | 0.50 | 0.30 | 4 |", "R U R' U'",
-		"長い間", "0.60秒", "面ごとの回転数", "R: 14（50%", "直近2ソルブ",
+		"長い間", "0.60秒", "面ごとの回転数", "R: 14（50%", "直近2ソルブ", "持ち方（解法の表記）: 下が黄・前が緑（右は赤）",
 	} {
 		if !strings.Contains(in, want) {
 			t.Errorf("SolveInput missing %q\n%s", want, in)
@@ -89,10 +92,23 @@ func TestTrendInput(t *testing.T) {
 		}
 		list = append(list, s)
 	}
-	in := TrendInput(list, "full", "white")
+	in := TrendInput(list, "full", settings.Defaults)
 	for _, want := range []string{"件数: 12（DNF 1）", "現在の ao5", "## 段階別（11ソルブの平均）", "## 前半", "## 後半", "最も時間を使った段階", "F2L: 11件"} {
 		if !strings.Contains(in, want) {
 			t.Errorf("TrendInput missing %q\n%s", want, in)
 		}
+	}
+}
+
+func TestSolveInputConvertsToHoldFrame(t *testing.T) {
+	// 白下・赤前：キューブの R → 持ち方では F、U → D
+	in := SolveInput(fullSolve(7, 1), nil, settings.Settings{CrossColor: "white", HoldBottom: "white", HoldFront: "red"})
+	for _, want := range []string{"F D F' D'", "F: 14（50%", "下が白・前が赤（右は緑）"} {
+		if !strings.Contains(in, want) {
+			t.Errorf("missing %q\n%s", want, in)
+		}
+	}
+	if strings.Contains(in, "R U R' U'") {
+		t.Errorf("moves should be converted\n%s", in)
 	}
 }

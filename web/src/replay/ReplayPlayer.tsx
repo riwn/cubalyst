@@ -2,6 +2,8 @@ import type { KPuzzle } from 'cubing/kpuzzle'
 import { TwistyPlayer } from 'cubing/twisty'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Solve } from '../api'
+import { convertMove, holdRotation } from '../cube/orientation'
+import { useHoldFrame, useSettings } from '../settings/hooks'
 import { STAGE_LABELS, type Split } from '../solve/cfop'
 import { formatTime } from '../solve/stats'
 import { solveStartPattern } from './start'
@@ -15,9 +17,19 @@ type Indexer = {
   algDuration(): number
 }
 
-/** ソルブの再生。実際の回転タイミングどおりに3Dキューブを動かす。 */
+/**
+ * ソルブの再生。実際の回転タイミングどおりに3Dキューブを動かす。
+ * 3D表示と手の記号は、設定の持ち方（下の色・前の色）に合わせる。
+ */
 export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzle }) {
-  const moves = useMemo(() => solve.moves ?? [], [solve.moves])
+  const { settings } = useSettings()
+  const frame = useHoldFrame()
+  const rawMoves = useMemo(() => solve.moves ?? [], [solve.moves])
+  const moves = useMemo(() => rawMoves.map((m) => ({ ...m, move: convertMove(frame, m.move) })), [rawMoves, frame])
+  const rotation = useMemo(
+    () => holdRotation(kpuzzle.defaultPattern(), settings.hold_bottom, settings.hold_front),
+    [kpuzzle, settings.hold_bottom, settings.hold_front],
+  )
   const times = useMemo(() => moves.map((m) => m.t), [moves])
   const total = totalDuration(times)
   const splits = solve.splits ?? []
@@ -44,7 +56,11 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
     player.indexer = 'simple'
     player.style.width = '100%'
     player.style.height = '100%'
-    player.experimentalModel.setupTransformation.set(solveStartPattern(kpuzzle, solve).experimentalToTransformation())
+    // 開始状態を持ち方の向きに持ち替えてから、持ち方の記号で回す
+    const start = solveStartPattern(kpuzzle, solve)
+    player.experimentalModel.setupTransformation.set(
+      (rotation ? start.applyAlg(rotation) : start).experimentalToTransformation(),
+    )
     container.appendChild(player)
     playerRef.current = player
     let cancelled = false
@@ -57,7 +73,7 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
       playerRef.current = null
       setIndexer(null)
     }
-  }, [kpuzzle, solve, moves])
+  }, [kpuzzle, solve, moves, rotation])
 
   // 実時間 → TwistyPlayer のタイムライン位置
   useEffect(() => {

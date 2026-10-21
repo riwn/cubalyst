@@ -61,7 +61,8 @@ func TestSplitsExportImport(t *testing.T) {
 	// テキスト
 	rec = do(t, h, http.MethodGet, "/api/export?format=txt", "")
 	txt := rec.Body.String()
-	for _, want := range []string{"5.000 (3.000+2)", "Scramble: R U", "Cross: U R  // 1.000, 2 moves", "PLL:   U", "Total: 3.000 / 3 moves", "Note: memo"} {
+	// 既定の持ち方（白下・緑前）では、キューブの U→D、R→L と表記される。スクランブルはそのまま
+	for _, want := range []string{"持ち方 下が白・前が緑（右は橙）", "5.000 (3.000+2)", "Scramble: R U", "Cross: D L  // 1.000, 2 moves", "PLL:   D", "Total: 3.000 / 3 moves", "Note: memo"} {
 		if !strings.Contains(txt, want) {
 			t.Errorf("txt missing %q:\n%s", want, txt)
 		}
@@ -103,7 +104,14 @@ func TestSettingsAPI(t *testing.T) {
 	if rec := do(t, h, http.MethodPut, "/api/settings", `{"cross_color":"pink"}`); rec.Code != http.StatusBadRequest {
 		t.Fatalf("invalid color: %d", rec.Code)
 	}
-	if rec := do(t, h, http.MethodGet, "/api/settings", ""); !strings.Contains(rec.Body.String(), `"yellow"`) {
+	if rec := do(t, h, http.MethodPut, "/api/settings", `{"cross_color":"white","hold_bottom":"white","hold_front":"red"}`); !strings.Contains(rec.Body.String(), `"hold_front":"red"`) {
+		t.Fatalf("put hold: %s", rec.Body)
+	}
+	// 前の色は下の色と隣り合っている必要がある
+	if rec := do(t, h, http.MethodPut, "/api/settings", `{"cross_color":"white","hold_bottom":"white","hold_front":"yellow"}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("invalid hold: %d", rec.Code)
+	}
+	if rec := do(t, h, http.MethodGet, "/api/settings", ""); !strings.Contains(rec.Body.String(), `"cross_color":"white","hold_bottom":"white","hold_front":"red"`) {
 		t.Fatalf("persisted settings: %s", rec.Body)
 	}
 }

@@ -5,22 +5,47 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"cubalyst/internal/notation"
 )
 
 // Settings はアプリ設定。
 type Settings struct {
 	// CrossColor はクロスの色（white/yellow/green/blue/red/orange）。
 	CrossColor string `json:"cross_color"`
+	// HoldBottom / HoldFront は解くときの持ち方（下の色・前の色）。解法の表記をこの向きに合わせる。
+	HoldBottom string `json:"hold_bottom"`
+	HoldFront  string `json:"hold_front"`
 }
 
 // Defaults は未設定時の値。
-var Defaults = Settings{CrossColor: "white"}
+var Defaults = Settings{CrossColor: "white", HoldBottom: "white", HoldFront: "green"}
+
+// Frame は持ち方での記号への変換。
+func (s Settings) Frame() notation.Frame {
+	f, err := notation.NewFrame(s.HoldBottom, s.HoldFront)
+	if err != nil {
+		return notation.Identity
+	}
+	return f
+}
+
+// HoldDescription は持ち方の説明（解析の入力などに使う）。
+func (s Settings) HoldDescription() string {
+	return fmt.Sprintf("下が%s・前が%s（右は%s）", colorJa[s.HoldBottom], colorJa[s.HoldFront],
+		colorJa[notation.RightColor(s.HoldBottom, s.HoldFront)])
+}
+
+var colorJa = map[string]string{"white": "白", "yellow": "黄", "green": "緑", "blue": "青", "red": "赤", "orange": "橙"}
 
 var crossColors = map[string]bool{"white": true, "yellow": true, "green": true, "blue": true, "red": true, "orange": true}
 
 func (s Settings) Validate() error {
 	if !crossColors[s.CrossColor] {
 		return fmt.Errorf("invalid cross_color %q", s.CrossColor)
+	}
+	if _, err := notation.NewFrame(s.HoldBottom, s.HoldFront); err != nil {
+		return err
 	}
 	return nil
 }
@@ -49,6 +74,10 @@ func (st *Store) Get(ctx context.Context) (Settings, error) {
 		switch k {
 		case "cross_color":
 			s.CrossColor = v
+		case "hold_bottom":
+			s.HoldBottom = v
+		case "hold_front":
+			s.HoldFront = v
 		}
 	}
 	return s, rows.Err()
@@ -59,8 +88,17 @@ func (st *Store) Put(ctx context.Context, s Settings) error {
 	if err := s.Validate(); err != nil {
 		return err
 	}
-	_, err := st.db.ExecContext(ctx, `INSERT INTO settings (key, value) VALUES ('cross_color', ?)
-		ON CONFLICT (key) DO UPDATE SET value = excluded.value,
-		updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`, s.CrossColor)
-	return err
+	tx, err := st.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for k, v := range map[string]string{"cross_color": s.CrossColor, "hold_bottom": s.HoldBottom, "hold_front": s.HoldFront} {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO settings (key, value) VALUES (?, ?)
+			ON CONFLICT (key) DO UPDATE SET value = excluded.value,
+			updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`, k, v); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

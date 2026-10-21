@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { exportUrl, importSolves } from '../api'
 import { useCubeStore } from '../cube/hooks'
+import { isValidHold, rightColor } from '../cube/orientation'
 import { useSettings } from '../settings/hooks'
 import { COLOR_LABELS, CROSS_COLORS, type CrossColor } from '../solve/cfop'
 import { recomputeAllSplits } from '../solve/recompute'
@@ -21,6 +22,18 @@ export function SettingsPage() {
       setError(String(err))
     }
   }
+
+  const changeHold = async (bottom: CrossColor, front: CrossColor) => {
+    setError(null)
+    // 前の色が下の色と隣り合わなくなったら、隣り合う最初の色にする
+    const f = isValidHold(bottom, front) ? front : CROSS_COLORS.find((c) => isValidHold(bottom, c))!
+    try {
+      await update({ ...settings, hold_bottom: bottom, hold_front: f })
+    } catch (err) {
+      setError(String(err))
+    }
+  }
+  const right = rightColor(settings.hold_bottom, settings.hold_front)
 
   const recompute = async () => {
     setError(null)
@@ -70,6 +83,41 @@ export function SettingsPage() {
         <div className="row">
           <button onClick={recompute}>全ソルブの段階を再計算</button>
           {progress && <span className="muted">{progress}</span>}
+        </div>
+      </section>
+
+      <section className="panel">
+        <h3>持ち方（解法の表記）</h3>
+        <p className="muted small">
+          スマートキューブはキューブ自身の向き（白上・緑前）で回転を記録します。解くときの持ち方を設定すると、
+          解法・再生・リコン・Claudeによる解析の記号をその向きに合わせて表示します（記録そのものは変わりません。スクランブルは白上・緑前のままです）。
+        </p>
+        <div className="row">
+          <label>
+            下{' '}
+            <select value={settings.hold_bottom} onChange={(e) => changeHold(e.target.value as CrossColor, settings.hold_front)}>
+              {CROSS_COLORS.map((c) => (
+                <option key={c} value={c}>
+                  {COLOR_LABELS[c]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            前{' '}
+            <select value={settings.hold_front} onChange={(e) => changeHold(settings.hold_bottom, e.target.value as CrossColor)}>
+              {CROSS_COLORS.filter((c) => isValidHold(settings.hold_bottom, c)).map((c) => (
+                <option key={c} value={c}>
+                  {COLOR_LABELS[c]}
+                </option>
+              ))}
+            </select>
+          </label>
+          {right && (
+            <span className="muted">
+              → 右は <span className={`swatch swatch--${right}`} /> {COLOR_LABELS[right]}
+            </span>
+          )}
         </div>
       </section>
 

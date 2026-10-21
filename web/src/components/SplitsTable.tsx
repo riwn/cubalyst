@@ -1,4 +1,6 @@
 import type { SolveMove } from '../api'
+import { convertMove } from '../cube/orientation'
+import { useHoldFrame } from '../settings/hooks'
 import { STAGE_LABELS, type Split } from '../solve/cfop'
 import { formatTime } from '../solve/stats'
 
@@ -6,8 +8,9 @@ function tps(moves: number, ms: number): string {
   return ms > 0 ? (moves / (ms / 1000)).toFixed(2) : '—'
 }
 
-/** 段階ごとの時間・手数・TPSと、その段階の解法。 */
+/** 段階ごとの時間・手数・TPSと、その段階の解法（設定の持ち方での記号）。 */
 export function SplitsTable({ splits, moves, totalMs }: { splits: Split[]; moves?: SolveMove[]; totalMs: number }) {
+  const frame = useHoldFrame()
   if (splits.length === 0) return <p className="muted">段階の記録がありません</p>
   return (
     <table className="splits-table">
@@ -25,7 +28,10 @@ export function SplitsTable({ splits, moves, totalMs }: { splits: Split[]; moves
       <tbody>
         {splits.map((s) => {
           const ms = s.end_ms - s.start_ms
-          const alg = moves?.slice(s.start_index, s.end_index).map((m) => m.move).join(' ')
+          const alg = moves
+            ?.slice(s.start_index, s.end_index)
+            .map((m) => convertMove(frame, m.move))
+            .join(' ')
           return (
             <tr key={s.stage}>
               <th>{STAGE_LABELS[s.stage]}</th>

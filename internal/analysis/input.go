@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"cubalyst/internal/export"
+	"cubalyst/internal/settings"
 	"cubalyst/internal/solves"
 )
 
@@ -16,6 +17,7 @@ const SystemPrompt = `あなたはルービックキューブ（3x3、CFOP法）
 
 前提:
 - 時間はすべて秒。回転ログはキューブが報告した90度回転の列で、180度回転（R2）は同じ面の2手（R R）として数えています
+- 解法・回転の記号は、解く人の持ち方（入力に記載）での面の名前に変換済みです。スクランブルだけはWCAの向き（白上・緑前）です
 - 「認識」はその段階の最初の手までの待ち時間（直前の段階の終わりから）、「実行」は最初の手から段階完了までです
 - 持ち替え（y回転など）はスマートキューブでは検出できないため、長い「間」として現れることがあります
 - データにない数値を推測で作らないでください。断定できないことは推測であると書いてください
@@ -99,7 +101,10 @@ func phases(s solves.Solve) []stagePhase {
 }
 
 // SolveInput は単一ソルブ解析の入力。recent は比較用の直近ソルブ（段階・回転ログ付き）。
-func SolveInput(s solves.Solve, recent []solves.Solve, crossColor string) string {
+// 回転の記号は設定の持ち方に合わせて変換する。
+func SolveInput(s solves.Solve, recent []solves.Solve, st settings.Settings) string {
+	s = export.WithFrame(s, st.Frame())
+	crossColor := st.CrossColor
 	var b strings.Builder
 	eff := export.EffectiveMS(s)
 	fmt.Fprintf(&b, "# 解析対象のソルブ（#%d）\n", s.ID)
@@ -114,7 +119,8 @@ func SolveInput(s solves.Solve, recent []solves.Solve, crossColor string) string
 	if s.Penalty != "" {
 		fmt.Fprintf(&b, "（ペナルティ %s、実測 %s）", s.Penalty, export.FormatTime(s.TotalMS))
 	}
-	fmt.Fprintf(&b, "\n- 手数: %d（TPS %s）\n- クロス色: %s\n- スクランブル: %s\n", len(s.Moves), tps(len(s.Moves), float64(s.TotalMS)), crossColor, s.Scramble)
+	fmt.Fprintf(&b, "\n- 手数: %d（TPS %s）\n- クロス色: %s\n- 持ち方（解法の表記）: %s\n- スクランブル（白上・緑前）: %s\n",
+		len(s.Moves), tps(len(s.Moves), float64(s.TotalMS)), crossColor, st.HoldDescription(), s.Scramble)
 
 	if ph := phases(s); len(ph) > 0 {
 		b.WriteString("\n## 段階ごと\n| 段階 | 所要 | 認識 | 実行 | 手数 | TPS(実行) | 解法 |\n|---|---|---|---|---|---|---|\n")
@@ -293,7 +299,8 @@ func recentStageAverages(list []solves.Solve) string {
 }
 
 // TrendInput は傾向分析の入力。list は古い順。
-func TrendInput(list []solves.Solve, mode string, crossColor string) string {
+func TrendInput(list []solves.Solve, mode string, st settings.Settings) string {
+	crossColor := st.CrossColor
 	var b strings.Builder
 	times := make([]int64, len(list))
 	dnf := 0
