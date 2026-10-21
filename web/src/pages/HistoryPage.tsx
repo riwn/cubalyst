@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { exportUrl, type ExportFormat, type SolveFilter, type SolveMode } from '../api'
-import { formatDate, MODE_LABELS } from '../format'
+import { exportUrl, type ExportFormat, type Solve, type SolveFilter, type SolveMode } from '../api'
+import { formatDate, KIND_LABELS, MODE_LABELS } from '../format'
 import { GROUP_LABELS, groupSplits, type StageGroup } from '../solve/cfop'
 import { useSolveList } from '../solve/hooks'
 import { effectiveTime, formatTime } from '../solve/stats'
@@ -29,7 +29,7 @@ export function HistoryPage() {
     from: from || undefined,
     to: to ? nextDay(to) : undefined,
   }
-  const { solves, total, error } = useSolveList({ ...filter, limit: PAGE_SIZE, offset: page * PAGE_SIZE, includeSplits: true })
+  const { solves, total, error } = useSolveList({ ...filter, limit: PAGE_SIZE, offset: page * PAGE_SIZE, includeSplits: true, includeAnalyses: true })
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const toggle = (id: number) => {
@@ -92,6 +92,7 @@ export function HistoryPage() {
               <th key={g}>{GROUP_LABELS[g]}</th>
             ))}
             <th>手数</th>
+            <th>解析</th>
             <th className="left">メモ</th>
           </tr>
         </thead>
@@ -119,6 +120,9 @@ export function HistoryPage() {
                   <td key={g}>{groups[g] ? formatTime(groups[g].ms) : ''}</td>
                 ))}
                 <td>{moves || ''}</td>
+                <td className="analysis-marks">
+                  <AnalysisMarks solveId={s.id} counts={s.analyses} />
+                </td>
                 <td className="left note">{s.note}</td>
               </tr>
             )
@@ -139,5 +143,29 @@ export function HistoryPage() {
         </button>
       </div>
     </div>
+  )
+}
+
+/** 解析の有無。単体はソルブの詳細へ、まとめはそのソルブを含むまとめ解析の一覧へ。 */
+function AnalysisMarks({ solveId, counts }: { solveId: number; counts: Solve['analyses'] }) {
+  if (!counts || (counts.solve === 0 && counts.multi === 0)) return null
+  return (
+    <>
+      {counts.solve > 0 && (
+        <Link className="kind-badge kind-badge--solve" to={`/history/${solveId}`} title="このソルブの単体の解析があります">
+          {KIND_LABELS.solve}
+        </Link>
+      )}
+      {counts.multi > 0 && (
+        <Link
+          className="kind-badge kind-badge--multi"
+          to={`/analyses?kind=multi&solve=${solveId}`}
+          title={`このソルブを含むまとめ解析が${counts.multi}件あります`}
+        >
+          {KIND_LABELS.multi}
+          {counts.multi > 1 && `×${counts.multi}`}
+        </Link>
+      )}
+    </>
   )
 }

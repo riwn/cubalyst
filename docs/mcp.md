@@ -3,7 +3,7 @@
 `cubalyst mcp` は、Cubalyst の記録を [MCP](https://modelcontextprotocol.io/) のツールとして公開する小さなサーバーです。
 Claude Code や Claude Desktop に登録すると、チャットで「直近のソルブを解析して」と頼むだけで、Claude がソルブを読んで解析し、結果をアプリに保存します。
 
-アプリの「このソルブを解析」ボタンと違って **API キーは要りません**。使った分は、Claude のプランの利用枠から差し引かれます。
+**API キーは要りません**。使った分は、Claude のプランの利用枠から差し引かれます。
 
 ```
 Claude Code / Claude Desktop
@@ -21,18 +21,18 @@ Claude Code / Claude Desktop
 
 | ツール | 内容 |
 |---|---|
-| `list_solves` | ソルブの一覧（ID、日時、タイム、手数、Cross / F2L / OLL / PLL ごとの時間、解析済みかどうか）と、最後の傾向分析の日時 |
-| `get_solve` | 1回のソルブの解析用データ（アプリ内の解析で Claude に渡しているものと同じ）。ID を省くと直近のフルソルブ |
-| `get_trend` | 直近 N 件の傾向分析用データ |
+| `list_solves` | ソルブの一覧（ID、日時、タイム、手数、Cross / F2L / OLL / PLL ごとの時間、単体の解析済みか、まとめ解析に含まれるか）と、最後のまとめ解析 |
+| `get_solve` | 1回のソルブを単体で解析するためのデータ。ID を省くと直近のフルソルブ |
+| `get_solves` | 複数のソルブをまとめて解析するためのデータと、対象にしたソルブの ID（`solve_ids`、または `mode`・`from`/`to`・`limit` で選ぶ） |
 | `list_analyses` | 保存済みの解析結果 |
-| `save_analysis` | 解析結果（Markdown）を保存する。単一ソルブはソルブの詳細画面、傾向は統計画面に表示される |
+| `save_analysis` | 解析結果（Markdown）を保存する。単体は `kind=solve`・`solve_id`、まとめは `kind=multi`・`solve_ids`・`title`。アプリの「解析」画面に表示される |
 
-解析の観点と出力の形式（日本語の Markdown、結論から書く、など）は、アプリ内の解析と同じものを、接続時に Claude へ渡しています。
+解析の観点と出力の形式（日本語の Markdown、結論から書く、など）は、接続時に Claude へ渡しています。
 
 決まった頼み方を、プロンプトとしても用意しています。
 
 - `analyze_solve`（引数 `solve_id`、省くと直近）：1回のソルブを解析して保存する
-- `analyze_trend`（引数 `limit`、既定 50）：傾向を分析して保存する
+- `analyze_recent`（引数 `limit`、既定 20）：直近 N 件をまとめて解析し、まとめとして保存する
 
 Claude Code では `/mcp__cubalyst__analyze_solve` のように、スラッシュコマンドとして呼べます。
 

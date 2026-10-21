@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
-import { analyzeTrend, listTrendAnalyses, type SolveMode } from '../api'
-import { AnalysisPanel } from '../components/AnalysisPanel'
+import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router'
+import { listAnalyses, type Analysis, type SolveMode } from '../api'
+import { AnalysisHowTo } from '../components/AnalysisCard'
 import { HistogramChart, TrendChart } from '../components/charts'
-import { MODE_LABELS } from '../format'
+import { formatDate, MODE_LABELS } from '../format'
 import { bests, histogram, stageStats, trend } from '../solve/aggregate'
 import { GROUP_LABELS, STAGE_LABELS, STAGES, type StageGroup } from '../solve/cfop'
 import { useSolveList } from '../solve/hooks'
@@ -47,7 +48,6 @@ export function StatsPage() {
   const [caseId, setCaseId] = useState('')
   const [step, setStep] = useState('')
   const [histN, setHistN] = useState(100)
-  const [trendN, setTrendN] = useState(50)
 
   const range =
     period === 'custom'
@@ -235,27 +235,7 @@ export function StatsPage() {
         </>
       )}
 
-      <AnalysisPanel
-        title="傾向分析（Claude）"
-        runLabel="傾向を分析"
-        load={() => listTrendAnalyses()}
-        run={() => analyzeTrend(mode, trendN)}
-        controls={
-          <label className="small">
-            {MODE_LABELS[mode]}の直近{' '}
-            <input
-              type="number"
-              min={5}
-              max={1000}
-              step={10}
-              value={trendN}
-              onChange={(e) => setTrendN(Math.min(1000, Math.max(1, Number(e.target.value) || 1)))}
-              style={{ width: '5em' }}
-            />{' '}
-            件
-          </label>
-        }
-      />
+      <RecentMultiAnalyses />
     </div>
   )
 }
@@ -267,5 +247,41 @@ function Tile({ label, value, sub }: { label: string; value: string; sub?: strin
       <div className="value">{value}</div>
       {sub && <div className="sub">{sub}</div>}
     </div>
+  )
+}
+
+/** 最近のまとめ解析（本文は「解析」画面で読む）。 */
+function RecentMultiAnalyses() {
+  const [list, setList] = useState<Analysis[] | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    listAnalyses({ kind: 'multi', limit: 5 })
+      .then((l) => !cancelled && setList(l))
+      .catch(() => !cancelled && setList([]))
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  return (
+    <section className="panel">
+      <div className="row">
+        <h3>まとめ解析（Claude）</h3>
+        <span className="spacer" />
+        <Link to="/analyses?kind=multi">すべて見る</Link>
+      </div>
+      {list?.length === 0 && <AnalysisHowTo />}
+      {list && list.length > 0 && (
+        <ul>
+          {list.map((a) => (
+            <li key={a.id}>
+              <Link to={`/analyses/${a.id}`}>
+                {a.title || 'まとめ'}（{a.solve_ids.length}件）
+              </Link>{' '}
+              <span className="muted small">{formatDate(a.created_at)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

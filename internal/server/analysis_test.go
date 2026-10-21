@@ -1,148 +1,128 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"cubalyst/internal/analysis"
-	"cubalyst/internal/db"
+	"cubalyst/internal/solves"
 )
 
-type fakeLLM struct {
-	prompts []string
-}
-
-func (f *fakeLLM) Model() string { return "fake-model" }
-
-func (f *fakeLLM) Complete(_ context.Context, system, prompt string) (analysis.Completion, error) {
-	f.prompts = append(f.prompts, prompt)
-	return analysis.Completion{Text: "## 結論\nF2Lが遅い", Model: "fake-model", InputTokens: 100, OutputTokens: 20}, nil
-}
-
-func newAnalysisServer(t *testing.T, llm analysis.LLM) http.Handler {
+func decode[T any](t *testing.T, body []byte) T {
 	t.Helper()
-	database, err := db.Open(filepath.Join(t.TempDir(), "test.db"))
-	if err != nil {
-		t.Fatal(err)
+	var v T
+	if err := json.Unmarshal(body, &v); err != nil {
+		t.Fatalf("decode: %v\n%s", err, body)
 	}
-	t.Cleanup(func() { database.Close() })
-	if err := db.Migrate(context.Background(), database); err != nil {
-		t.Fatal(err)
-	}
-	return New(database, t.TempDir(), llm).Handler()
+	return v
 }
 
-func TestAnalysisNotConfigured(t *testing.T) {
-	h := newAnalysisServer(t, nil)
-	if rec := do(t, h, http.MethodGet, "/api/analysis/status", ""); !strings.Contains(rec.Body.String(), `"configured":false`) {
-		t.Fatalf("status: %s", rec.Body)
-	}
-	do(t, h, http.MethodPost, "/api/solves", solveWithSplits)
-	if rec := do(t, h, http.MethodPost, "/api/solves/1/analyses", ""); rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "ANTHROPIC_API_KEY") {
-		t.Fatalf("analyze without key: %d %s", rec.Code, rec.Body)
-	}
-}
-
+// 解析は MCP 経由の Claude が書く。サーバーは入力データを渡し、書かれた結果を対象のソルブと一緒に保存する
 func TestAnalysisFlow(t *testing.T) {
-	llm := &fakeLLM{}
-	h := newAnalysisServer(t, llm)
-	if rec := do(t, h, http.MethodGet, "/api/analysis/status", ""); !strings.Contains(rec.Body.String(), `"model":"fake-model"`) {
-		t.Fatalf("status: %s", rec.Body)
-	}
-	do(t, h, http.MethodPost, "/api/solves", solveWithSplits)
-
-	rec := do(t, h, http.MethodPost, "/api/solves/1/analyses", "")
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("analyze: %d %s", rec.Code, rec.Body)
-	}
-	var a analysis.Analysis
-	json.Unmarshal(rec.Body.Bytes(), &a)
-	if a.Kind != "solve" || *a.SolveID != 1 || a.Result == "" || a.InputTokens != 100 || !strings.Contains(a.Input, "| Cross |") {
-		t.Fatalf("analysis: %+v", a)
-	}
-	if !strings.Contains(llm.prompts[0], "改善点") {
-		t.Fatalf("prompt: %s", llm.prompts[0])
-	}
-	if rec := do(t, h, http.MethodPost, "/api/solves/99/analyses", ""); rec.Code != http.StatusNotFound {
-		t.Fatalf("missing solve: %d", rec.Code)
+	h := newTestServer(t, t.TempDir())
+	for range 3 {
+		do(t, h, http.MethodPost, "/api/solves", solveWithSplits)
 	}
 
-	rec = do(t, h, http.MethodPost, "/api/analyses/trend", `{"mode":"full","limit":10}`)
-	if rec.Code != http.StatusCreated || !strings.Contains(rec.Body.String(), `"kind":"trend"`) {
-		t.Fatalf("trend: %d %s", rec.Code, rec.Body)
-	}
-	if rec := do(t, h, http.MethodPost, "/api/analyses/trend", `{"mode":"case","limit":10}`); rec.Code != http.StatusBadGateway {
-		t.Fatalf("trend with no solves: %d %s", rec.Code, rec.Body)
-	}
-
-	var list []analysis.Analysis
-	json.Unmarshal(do(t, h, http.MethodGet, "/api/solves/1/analyses", "").Body.Bytes(), &list)
-	if len(list) != 1 {
-		t.Fatalf("solve analyses: %d", len(list))
-	}
-	json.Unmarshal(do(t, h, http.MethodGet, "/api/analyses?kind=trend", "").Body.Bytes(), &list)
-	if len(list) != 1 || list[0].Kind != "trend" {
-		t.Fatalf("trend analyses: %+v", list)
-	}
-
-	// ソルブを消すと解析も消える
-	do(t, h, http.MethodDelete, "/api/solves/1", "")
-	json.Unmarshal(do(t, h, http.MethodGet, "/api/analyses?kind=solve", "").Body.Bytes(), &list)
-	if len(list) != 0 {
-		t.Fatalf("cascade delete: %+v", list)
-	}
-	if rec := do(t, h, http.MethodDelete, "/api/analyses/2", ""); rec.Code != http.StatusNoContent {
-		t.Fatalf("delete analysis: %d", rec.Code)
-	}
-}
-
-// API キーが無くても、入力データの取得と、外で書いた解析結果の保存はできる（MCP 経由の Claude 用）
-func TestExternalAnalysis(t *testing.T) {
-	h := newAnalysisServer(t, nil)
-	do(t, h, http.MethodPost, "/api/solves", solveWithSplits)
-
+	// 単体の入力データ
 	rec := do(t, h, http.MethodGet, "/api/solves/1/analysis-input", "")
-	var in struct {
-		Input, System, Request string
-	}
-	json.Unmarshal(rec.Body.Bytes(), &in)
-	if rec.Code != http.StatusOK || !strings.Contains(in.Input, "| Cross |") || in.System != analysis.SystemPrompt || in.Request == "" {
+	in := decode[analysisInput](t, rec.Body.Bytes())
+	if rec.Code != http.StatusOK || !strings.Contains(in.Input, "| Cross |") || in.System != analysis.SystemPrompt || len(in.SolveIDs) != 1 {
 		t.Fatalf("solve input: %d %s", rec.Code, rec.Body)
 	}
 	if rec := do(t, h, http.MethodGet, "/api/solves/99/analysis-input", ""); rec.Code != http.StatusNotFound {
 		t.Fatalf("missing solve input: %d", rec.Code)
 	}
-	rec = do(t, h, http.MethodGet, "/api/analysis-input/trend?limit=10", "")
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"params":{"mode":"full","limit":10}`) {
-		t.Fatalf("trend input: %d %s", rec.Code, rec.Body)
+
+	// まとめの入力データ：件数・ID 指定。対象にしたソルブの ID が返る
+	rec = do(t, h, http.MethodGet, "/api/analysis-input?limit=2", "")
+	in = decode[analysisInput](t, rec.Body.Bytes())
+	if rec.Code != http.StatusOK || len(in.SolveIDs) != 2 || in.SolveIDs[0] != 2 || !strings.Contains(in.Input, "対象のソルブ: #2 #3") || in.Title == "" {
+		t.Fatalf("multi input by limit: %d %s", rec.Code, rec.Body)
 	}
-	if rec := do(t, h, http.MethodGet, "/api/analysis-input/trend?mode=case", ""); rec.Code != http.StatusBadRequest {
-		t.Fatalf("trend input with no solves: %d", rec.Code)
+	rec = do(t, h, http.MethodGet, "/api/analysis-input?ids=1,3&title=%E7%B7%B4%E7%BF%92", "")
+	in = decode[analysisInput](t, rec.Body.Bytes())
+	if rec.Code != http.StatusOK || len(in.SolveIDs) != 2 || in.Title != "練習" || !strings.Contains(in.Input, "まとめ解析の対象（練習）") {
+		t.Fatalf("multi input by ids: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, h, http.MethodGet, "/api/analysis-input?ids=1,99", ""); rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "#99") {
+		t.Fatalf("multi input with missing id: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, h, http.MethodGet, "/api/analysis-input?mode=case", ""); rec.Code != http.StatusBadRequest {
+		t.Fatalf("multi input with no solves: %d", rec.Code)
 	}
 
+	// 保存
 	rec = do(t, h, http.MethodPost, "/api/analyses", `{"kind":"solve","solve_id":1,"result":"## 結論\nクロスが長い"}`)
-	var a analysis.Analysis
-	json.Unmarshal(rec.Body.Bytes(), &a)
-	if rec.Code != http.StatusCreated || a.Kind != "solve" || *a.SolveID != 1 || a.Model != analysis.ExternalModel || !strings.Contains(a.Input, "| Cross |") {
+	a := decode[analysis.Analysis](t, rec.Body.Bytes())
+	if rec.Code != http.StatusCreated || a.Kind != "solve" || len(a.SolveIDs) != 1 || a.SolveIDs[0] != 1 || a.Model != analysis.ExternalModel || !strings.Contains(a.Input, "| Cross |") {
 		t.Fatalf("save solve: %d %s", rec.Code, rec.Body)
 	}
-	rec = do(t, h, http.MethodPost, "/api/analyses", `{"kind":"trend","params":{"limit":5},"result":"ok","model":"Claude Opus"}`)
-	json.Unmarshal(rec.Body.Bytes(), &a)
-	if rec.Code != http.StatusCreated || a.Kind != "trend" || a.Model != "Claude Opus" || string(a.Params) != `{"mode":"full","limit":5}` {
-		t.Fatalf("save trend: %d %s", rec.Code, rec.Body)
+	rec = do(t, h, http.MethodPost, "/api/analyses", `{"kind":"multi","solve_ids":[3,1],"title":"今日の練習","params":{"limit":2},"result":"まとめ","model":"Claude Opus 5.5"}`)
+	m := decode[analysis.Analysis](t, rec.Body.Bytes())
+	if rec.Code != http.StatusCreated || m.Kind != "multi" || m.Title != "今日の練習" || len(m.SolveIDs) != 2 || m.SolveIDs[0] != 1 || string(m.Params) != `{"limit":2}` {
+		t.Fatalf("save multi: %d %s", rec.Code, rec.Body)
 	}
-
+	rec = do(t, h, http.MethodPost, "/api/analyses", `{"kind":"multi","solve_ids":[2,3],"result":"見出しなし"}`)
+	if m2 := decode[analysis.Analysis](t, rec.Body.Bytes()); rec.Code != http.StatusCreated || !strings.HasPrefix(m2.Title, "2件（") {
+		t.Fatalf("save multi without title: %d %s", rec.Code, rec.Body)
+	}
 	for body, code := range map[string]int{
-		`{"kind":"solve","solve_id":1,"result":"  "}`: http.StatusBadRequest,
-		`{"kind":"other","result":"x"}`:               http.StatusBadRequest,
-		`{"kind":"solve","solve_id":99,"result":"x"}`: http.StatusNotFound,
+		`{"kind":"solve","solve_id":1,"result":"  "}`:      http.StatusBadRequest,
+		`{"kind":"trend","result":"x"}`:                    http.StatusBadRequest,
+		`{"kind":"multi","solve_ids":[1],"result":"x"}`:    http.StatusBadRequest,
+		`{"kind":"solve","solve_id":99,"result":"x"}`:      http.StatusNotFound,
+		`{"kind":"multi","solve_ids":[1,99],"result":"x"}`: http.StatusNotFound,
 	} {
 		if rec := do(t, h, http.MethodPost, "/api/analyses", body); rec.Code != code {
 			t.Errorf("%s: %d %s", body, rec.Code, rec.Body)
 		}
+	}
+
+	// 一覧：種類・ソルブで絞り込む（ソルブで絞ると単体とまとめの両方）
+	list := decode[[]analysis.Analysis](t, do(t, h, http.MethodGet, "/api/analyses?kind=multi", "").Body.Bytes())
+	if len(list) != 2 {
+		t.Fatalf("multi analyses: %+v", list)
+	}
+	list = decode[[]analysis.Analysis](t, do(t, h, http.MethodGet, "/api/analyses?solve_id=1", "").Body.Bytes())
+	if len(list) != 2 || list[0].Kind != "multi" || list[1].Kind != "solve" {
+		t.Fatalf("analyses of solve 1: %+v", list)
+	}
+	if rec := do(t, h, http.MethodGet, "/api/analyses?kind=trend", ""); rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad kind: %d", rec.Code)
+	}
+	if rec := do(t, h, http.MethodGet, "/api/analyses/2", ""); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "今日の練習") {
+		t.Fatalf("get analysis: %d %s", rec.Code, rec.Body)
+	}
+
+	// ソルブ一覧に解析の数が付く
+	res := decode[listResponse](t, do(t, h, http.MethodGet, "/api/solves?include=analyses&order=asc", "").Body.Bytes())
+	want := []solves.AnalysisCounts{{Solve: 1, Multi: 1}, {Solve: 0, Multi: 1}, {Solve: 0, Multi: 2}}
+	for i, s := range res.Solves {
+		if s.Analyses == nil || *s.Analyses != want[i] {
+			t.Fatalf("solve %d analyses: %+v", s.ID, s.Analyses)
+		}
+	}
+	if res := decode[listResponse](t, do(t, h, http.MethodGet, "/api/solves", "").Body.Bytes()); res.Solves[0].Analyses != nil {
+		t.Fatal("analyses should be omitted without include")
+	}
+
+	// ソルブを消すと、単体の解析は消え、まとめの解析は残って対象から外れる
+	do(t, h, http.MethodDelete, "/api/solves/1", "")
+	if rec := do(t, h, http.MethodGet, "/api/analyses/1", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("single analysis should be deleted with its solve: %d", rec.Code)
+	}
+	m = decode[analysis.Analysis](t, do(t, h, http.MethodGet, "/api/analyses/2", "").Body.Bytes())
+	if len(m.SolveIDs) != 1 || m.SolveIDs[0] != 3 {
+		t.Fatalf("multi analysis after delete: %+v", m.SolveIDs)
+	}
+
+	if rec := do(t, h, http.MethodDelete, "/api/analyses/2", ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete analysis: %d", rec.Code)
+	}
+	if rec := do(t, h, http.MethodDelete, "/api/analyses/2", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("delete missing analysis: %d", rec.Code)
 	}
 }

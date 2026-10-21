@@ -95,8 +95,9 @@ GAN系のキューブは通信の暗号化にMACアドレスを使います。�
 |---|---|
 | タイマー | スクランブル（進捗ハイライト・間違えたときの戻し手順）、WCA方式のインスペクション（15秒、超過で+2/DNF）、最初の回転で計測開始・完成で停止、+2/DNF、ao5/ao12 |
 | 練習 | 手順練習（OLL 57 / PLL 21 / F2L 41 から1つ選び、その手順を何度も回して1回ごとの時間を計測。揃っていなくてもよい）、ステップ練習（Cross / F2L / OLL / PLL の直前状態から） |
-| 履歴 | 一覧（フィルタ・ページング）、詳細（CFOPのステップタイム・割合のグラフ・解法・TPS、再生、メモ、Claudeによる解析）、export |
-| 統計 | ベスト記録、推移（single/ao5/ao12）、分布、段階別統計、Claudeによる傾向分析 |
+| 履歴 | 一覧（フィルタ・ページング）、詳細（CFOPのステップタイム・割合のグラフ・解法・TPS、再生、メモ、解析）、export、解析の有無の列 |
+| 統計 | ベスト記録、推移（single/ao5/ao12）、分布、段階別統計、最近のまとめ解析 |
+| 解析 | Claude が書いた解析の一覧（単体＝1回のソルブ／まとめ＝複数のソルブ）と、まとめの対象のソルブ |
 | 設定 | クロス色、インスペクション、持ち方（解法の表記の向き）、ステップの再計算、export（JSON/CSV/テキスト）、import（JSON） |
 
 ### 持ち方と解法の表記
@@ -109,18 +110,8 @@ GAN系のキューブは通信の暗号化にMACアドレスを使います。�
 
 ## Claudeによる解析
 
-ソルブ詳細の「このソルブを解析」と、統計の「傾向を分析」で Claude API を使います。サーバーを `ANTHROPIC_API_KEY` 付きで起動してください。
-
-```
-ANTHROPIC_API_KEY=sk-ant-... make dev
-```
-
-APIキーは [Claude Console](https://platform.claude.com/) で作成できます。
-
-- モデルは既定で `claude-opus-5-5`、effort は `high` です（下の環境変数で変更できます）。1回の解析でおおよそ十数円〜数十円のAPI利用料がかかります（使ったトークン数は結果の横に表示されます）
-- 安全分類による拒否に備えて、サーバー側フォールバック（`fallbacks: "default"`）を有効にしています
-- 解析に渡したデータ（入力）と結果は `analyses` テーブルに保存され、画面の「入力データ」で確認できます
-- APIキーなしで画面だけ確かめたいときは `CUBALYST_CLAUDE_MOCK=1` で起動すると、決まった文面を返すモックになります（課金なし）
+解析は、Claude Code や Claude Desktop から MCP（`cubalyst mcp`）経由で Claude が行い、結果をアプリに保存します。アプリ自身は Claude API を呼びません（API キーは要りません）。
+解析には、1回のソルブの「単体」と、複数のソルブをまとめた「まとめ」があり、どのソルブを対象にしたかも保存します（`analyses` と `analysis_solves`）。
 
 ### MCP で解析する（API キーなし）
 
@@ -135,11 +126,6 @@ APIキーは [Claude Console](https://platform.claude.com/) で作成できま�
 | `-addr` | `CUBALYST_ADDR` | `127.0.0.1:8080` | 待ち受けアドレス（ループバックのみ） |
 | `-db` | `CUBALYST_DB` | `./data/cubalyst.db` | SQLiteファイルのパス |
 | `-static` | `CUBALYST_STATIC` | `./web/dist` | ビルド済みフロントエンドのディレクトリ |
-| — | `ANTHROPIC_API_KEY` | — | Claude APIキー（未設定なら解析機能だけ無効） |
-| — | `ANTHROPIC_WORKSPACE_ID` | — | APIキーがワークスペースに紐付いていない場合に、使うワークスペースのID（`wrkspc_...`） |
-| — | `CUBALYST_CLAUDE_MODEL` | `claude-opus-5-5` | 解析に使うモデル |
-| — | `CUBALYST_CLAUDE_EFFORT` | `high` | effort（low / medium / high / xhigh / max） |
-| — | `CUBALYST_CLAUDE_MOCK` | — | `1` で解析をモック応答にする（開発用） |
 
 Goサーバーのポートを変えた場合は、Vite側にも `CUBALYST_API=http://127.0.0.1:<port>` を渡してください。
 
@@ -161,7 +147,7 @@ internal/server/       HTTPルーティング・APIハンドラ・静的配信
 internal/solves/       ソルブと段階区切りの保存
 internal/export/       export（JSON / CSV / テキスト）と import
 internal/settings/     設定（クロス色）
-internal/analysis/     Claudeによる解析（入力データの集計・整形、API呼び出し、保存）
+internal/analysis/     解析（入力データの集計・整形、Claude が書いた結果の保存）
 internal/mcpserver/    MCP サーバー（`cubalyst mcp`。HTTP API を呼んでツールとして公開）
 skills/                Claude 用のスキル（MCP を使った解析の進め方）と、その入れ方（install.sh）
 web/                   フロントエンド（Vite + React + TypeScript）
@@ -192,13 +178,10 @@ data/                  DBファイル置き場（git管理外）
 | GET | `/api/export?format=json\|csv\|txt` | export（一覧と同じフィルタ） |
 | POST | `/api/import` | JSON export の取り込み（重複はスキップ） |
 | GET | `/api/cases` | ケース練習のマスタ（`set=OLL` など） |
-| GET | `/api/analysis/status` | Claude API が使えるか |
-| GET / POST | `/api/solves/{id}/analyses` | ソルブの解析結果一覧 / 解析の実行 |
-| POST | `/api/analyses/trend` | 傾向分析（`{"mode":"full","limit":50}`） |
-| GET / DELETE | `/api/analyses`, `/api/analyses/{id}` | 解析結果の一覧（`kind=trend`）/ 削除 |
-| POST | `/api/analyses` | アプリの外で書いた解析結果の保存（`{"kind":"solve","solve_id":1,"result":"..."}`、傾向は `"params":{"mode":"full","limit":50}`） |
-| GET | `/api/solves/{id}/analysis-input` | ソルブの解析に渡す入力データ（MCP 用） |
-| GET | `/api/analysis-input/trend` | 傾向分析に渡す入力データ（`mode` `limit`、MCP 用） |
+| GET / POST | `/api/analyses` | 解析結果の一覧（`kind=solve\|multi` `solve_id` `limit`）/ 保存（単体 `{"kind":"solve","solve_id":1,"result":"..."}`、まとめ `{"kind":"multi","solve_ids":[1,2],"title":"...","result":"..."}`） |
+| GET / DELETE | `/api/analyses/{id}` | 解析結果の取得 / 削除 |
+| GET | `/api/solves/{id}/analysis-input` | 単体の解析に渡す入力データ（MCP 用） |
+| GET | `/api/analysis-input` | まとめの解析に渡す入力データと対象のソルブ（`ids` または `mode` `from` `to` `limit`、`title`。MCP 用） |
 
 ### ケースのマスタ
 

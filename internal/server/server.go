@@ -28,14 +28,14 @@ type Server struct {
 	analysis  *analysis.Service
 }
 
-// New はサーバーを作る。llm が nil の場合、解析APIは「未設定」を返す。
-func New(database *sql.DB, staticDir string, llm analysis.LLM) *Server {
+// New はサーバーを作る。
+func New(database *sql.DB, staticDir string) *Server {
 	return &Server{
 		db:        database,
 		staticDir: staticDir,
 		solves:    solves.NewStore(database),
 		settings:  settings.NewStore(database),
-		analysis:  analysis.NewService(database, llm),
+		analysis:  analysis.NewService(database),
 	}
 }
 
@@ -54,15 +54,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/export", s.handleExport)
 	mux.HandleFunc("POST /api/import", s.handleImport)
 	mux.HandleFunc("GET /api/cases", s.handleListCases)
-	mux.HandleFunc("GET /api/analysis/status", s.handleAnalysisStatus)
-	mux.HandleFunc("POST /api/solves/{id}/analyses", s.handleAnalyzeSolve)
-	mux.HandleFunc("GET /api/solves/{id}/analyses", s.handleListSolveAnalyses)
-	mux.HandleFunc("POST /api/analyses/trend", s.handleAnalyzeTrend)
 	mux.HandleFunc("GET /api/analyses", s.handleListAnalyses)
 	mux.HandleFunc("POST /api/analyses", s.handleSaveAnalysis)
-	mux.HandleFunc("GET /api/solves/{id}/analysis-input", s.handleSolveAnalysisInput)
-	mux.HandleFunc("GET /api/analysis-input/trend", s.handleTrendAnalysisInput)
+	mux.HandleFunc("GET /api/analyses/{id}", s.handleGetAnalysis)
 	mux.HandleFunc("DELETE /api/analyses/{id}", s.handleDeleteAnalysis)
+	mux.HandleFunc("GET /api/solves/{id}/analysis-input", s.handleSolveAnalysisInput)
+	mux.HandleFunc("GET /api/analysis-input", s.handleMultiAnalysisInput)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 	})

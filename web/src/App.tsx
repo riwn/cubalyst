@@ -3,6 +3,7 @@ import { NavLink, Route, Routes } from 'react-router'
 import { SystemMenu } from './HealthStatus'
 import { CubeConnectionControl, CubeNotices } from './components/ConnectionPanel'
 import { CubeStoreProvider } from './cube/CubeStoreProvider'
+import { AnalysesPage, AnalysisDetailPage } from './pages/AnalysesPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { PracticePage } from './pages/PracticePage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -16,6 +17,7 @@ const pages: { path: string; label: string; end?: boolean; element?: ReactNode }
   { path: '/practice', label: '練習', element: <PracticePage /> },
   { path: '/history', label: '履歴', element: <HistoryPage /> },
   { path: '/stats', label: '統計', element: <StatsPage /> },
+  { path: '/analyses', label: '解析', element: <AnalysesPage /> },
   { path: '/settings', label: '設定', element: <SettingsPage /> },
 ]
 
@@ -54,6 +56,7 @@ export default function App() {
                 <Route key={p.path} path={p.path} element={p.element ?? <Placeholder title={p.label} />} />
               ))}
               <Route path="/history/:id" element={<SolveDetailPage />} />
+              <Route path="/analyses/:id" element={<AnalysisDetailPage />} />
               <Route path="*" element={<Placeholder title="ページが見つかりません" />} />
             </Routes>
           </main>
