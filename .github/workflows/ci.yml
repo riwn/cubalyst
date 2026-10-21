@@ -1,0 +1,51 @@
+# main への push と PR で、Makefile の test と同じ確認をする。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Go（vet・test・build）
+    runs-on: ubuntu-latest
+    env:
+      # go.mod の版で固定する（自動ツールチェーンダウンロードを使わない）
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go build -o bin/cubalyst ./cmd/cubalyst
+
+  web:
+    name: Web（typecheck・lint・test・build）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # package-lock.json の GitHub 依存は git+ssh で記録されている。CI には鍵がないので https で取得する
+      - run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
