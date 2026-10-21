@@ -1,4 +1,5 @@
 import type { SessionState, SolveSession } from '../solve/session'
+import { KebabMenu } from '../ui/Popover'
 
 /** スクランブル手順と進捗。間違えたときは戻す手順を表示する。 */
 export function ScrambleDisplay({ session, state }: { session: SolveSession; state: SessionState }) {
@@ -36,15 +37,36 @@ export function ScrambleDisplay({ session, state }: { session: SolveSession; sta
         )}
       </div>
       <div className="row scramble-actions">
-        {(phase === 'scrambling' || phase === 'needSolved') && (
-          <button onClick={() => session.forceReady()} title="スクランブルの追跡がうまくいかないときに使います">
-            スクランブル完了にする
+        {phase !== 'running' && (
+          <button
+            className="icon-button"
+            onClick={() => void session.next()}
+            disabled={phase === 'generating'}
+            title="新しいスクランブル"
+            aria-label="新しいスクランブル"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path
+                d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
         )}
-        {phase !== 'running' && (
-          <button onClick={() => void session.next()} disabled={phase === 'generating'}>
-            新しいスクランブル
-          </button>
+        {(phase === 'scrambling' || phase === 'needSolved') && (
+          <KebabMenu
+            align="left"
+            items={[
+              {
+                label: 'スクランブル完了にする（追跡がうまくいかないとき）',
+                onSelect: () => session.forceReady(),
+              },
+            ]}
+          />
         )}
         {phase === 'running' && <button onClick={() => session.abort()}>中止</button>}
       </div>

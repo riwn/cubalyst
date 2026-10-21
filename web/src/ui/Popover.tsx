@@ -57,9 +57,17 @@ export function Popover({
 export type MenuItem = { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean } | 'separator'
 
 /** 「⋯」メニュー。危険な操作は danger で赤字にする。 */
-export function KebabMenu({ items, title = 'その他の操作' }: { items: MenuItem[]; title?: string }) {
+export function KebabMenu({
+  items,
+  title = 'その他の操作',
+  align = 'right',
+}: {
+  items: MenuItem[]
+  title?: string
+  align?: 'left' | 'right'
+}) {
   return (
-    <Popover trigger="⋯" title={title} buttonClassName="kebab" className="kebab-menu">
+    <Popover trigger="⋯" title={title} buttonClassName="kebab" className="kebab-menu" align={align}>
       {(close) => (
         <ul className="menu" role="menu">
           {items.map((item, i) =>
