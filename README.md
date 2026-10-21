@@ -124,7 +124,7 @@ APIキーは [Claude Console](https://platform.claude.com/) で作成できま�
 
 ### MCP で解析する（API キーなし）
 
-`cubalyst mcp` を Claude Code や Claude Desktop に MCP サーバーとして登録すると、チャットで Claude にソルブを解析させ、結果をアプリに保存できます。API キーは要らず、Claude のプランの利用枠で動きます。登録のしかたは [docs/mcp.md](docs/mcp.md) にまとめています。
+`cubalyst mcp` を Claude Code や Claude Desktop に MCP サーバーとして登録すると、チャットで Claude にソルブを解析させ、結果をアプリに保存できます。API キーは要らず、Claude のプランの利用枠で動きます。解析の進め方とコーチとしての知識は、スキル `cubalyst-coach`（`skills/`）にまとめています。登録のしかたは [docs/mcp.md](docs/mcp.md) にまとめています。
 
 ## 設定
 
@@ -163,6 +163,7 @@ internal/export/       export（JSON / CSV / テキスト）と import
 internal/settings/     設定（クロス色）
 internal/analysis/     Claudeによる解析（入力データの集計・整形、API呼び出し、保存）
 internal/mcpserver/    MCP サーバー（`cubalyst mcp`。HTTP API を呼んでツールとして公開）
+skills/                Claude 用のスキル（MCP を使った解析の進め方）と、その入れ方（install.sh）
 web/                   フロントエンド（Vite + React + TypeScript）
 web/src/cube/          キューブ接続（実機・モック）、状態管理、facelets変換、時計ズレ補正
 web/src/solve/         スクランブル追跡、計測セッション、CFOP段階検出、統計

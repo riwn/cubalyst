@@ -75,7 +75,7 @@ func TestSolveInput(t *testing.T) {
 		settings.Settings{CrossColor: "white", HoldBottom: "yellow", HoldFront: "green"})
 	for _, want := range []string{
 		"#7", "クロス色: white", "| Cross |", "| F2L 2 | 0.80 | 0.50 | 0.30 | 4 |", "R U R' U'",
-		"長い間", "0.60秒", "面ごとの回転数", "R: 14（50%", "直近2ソルブ", "持ち方（解法の表記）: 下が黄・前が緑（右は赤）",
+		"打ち消しで消えた手", "長い間", "0.60秒", "面ごとの回転数", "R: 14（50%", "直近2ソルブ", "持ち方（解法の表記）: 下が黄・前が緑（右は赤）",
 	} {
 		if !strings.Contains(in, want) {
 			t.Errorf("SolveInput missing %q\n%s", want, in)

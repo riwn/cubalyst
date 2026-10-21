@@ -99,6 +99,34 @@ Claude Desktop の「設定 → 開発者 → 設定を編集」で開く `claud
 
 うまくつながらないときは、Claude Desktop のログ（Windows では `%APPDATA%\Claude\logs\mcp-server-cubalyst.log`）にエラーが出ます。
 
+## スキル（解析の進め方とコーチの知識）
+
+MCP はデータの出し入れだけを受け持ちます。どう解析するか（前回の指摘との比較、レベルに合った助言、アプリの練習への落とし込み）は、スキル `cubalyst-coach`（[skills/cubalyst-coach/](../skills/cubalyst-coach/SKILL.md)）にまとめています。
+「ソルブを解析して」「何を練習すればいい？」のような頼み方に合うと Claude が自動で読み込み、MCP のツールを使って解析します。
+
+MCP の登録とあわせて入れておくと、解析の質が揃います。
+
+### Claude Code
+
+サーバーのマシンで、リポジトリの次のスクリプトを実行します。`~/.claude/skills/cubalyst-coach` から、デプロイ済みの版（`~/deploy/cubalyst/current/skills/cubalyst-coach`）へシンボリックリンクを張るので、`deploy/release.sh` でデプロイするたびにスキルも新しくなります。
+
+```bash
+skills/install.sh
+```
+
+- スキルを書き換えながら試すときは `skills/install.sh --dev`（リポジトリの作業中のファイルへリンク）
+- 外すときは `skills/install.sh --remove`
+
+### Claude Desktop
+
+アップロード用の zip を作り、PC にコピーして、Claude Desktop の「設定 → 機能 → スキル」からアップロードします。
+
+```bash
+skills/install.sh --zip
+```
+
+`skills/dist/cubalyst-coach.zip` ができます。スキルを変えたときは、zip を作り直してアップロードし直します。
+
 ## 注意
 
 - **claude.ai（ブラウザ）や Claude のスマホアプリからは使えません。** これらのカスタムコネクタは Anthropic のサーバーから接続しに来るので、インターネットに公開していないサーバーには届きません

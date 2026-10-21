@@ -133,6 +133,8 @@ func SolveInput(s solves.Solve, recent []solves.Solve, st settings.Settings) str
 			fmt.Fprintf(&b, "| %s | %s | %s | %s | %d | %s | %s |\n", stageNames[p.stage], sec(p.durationMS),
 				sec(p.recognition), sec(p.execution), p.moves, tps(p.moves, p.execution), alg)
 		}
+		b.WriteString("\n解法は同じ面の続きをまとめた表記です（R R → R2、R R R → R'、R R' は打ち消して消える）。" +
+			"R2 を2手として数えても手数より少ないときは、その差が打ち消しで消えた手（回して戻した手）です。\n")
 	} else if len(s.Moves) > 0 {
 		fmt.Fprintf(&b, "\n## 解法\n%s\n", mergeMoves(s.Moves))
 	}
