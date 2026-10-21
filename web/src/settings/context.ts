@@ -6,7 +6,7 @@ export type SettingsContextValue = {
   update: (s: Settings) => Promise<void>
 }
 
-export const DEFAULT_SETTINGS: Settings = { cross_color: 'white', hold_bottom: 'white', hold_front: 'green' }
+export const DEFAULT_SETTINGS: Settings = { cross_color: 'white', hold_bottom: 'white', hold_front: 'green', inspection: true }
 
 export const SettingsContext = createContext<SettingsContextValue>({
   settings: DEFAULT_SETTINGS,

@@ -2,12 +2,16 @@ import type { KPattern } from 'cubing/kpuzzle'
 import { TwistyPlayer } from 'cubing/twisty'
 import { useEffect, useRef } from 'react'
 import { useCubeStore } from '../cube/hooks'
+import { convertMove, type Frame } from '../cube/orientation'
 
 /** アニメーション用に積み上げる手数の上限。超えたら現在状態で置き換えてリセットする。 */
 const MAX_QUEUED_MOVES = 100
 
-/** 実機（またはモック）の状態に同期する3Dキューブ。 */
-export function CubeView() {
+/**
+ * 実機（またはモック）の状態に同期する3Dキューブ。
+ * hold を渡すと、持ち方の向き（下の色が下・前の色が前）で表示する。省略時はキューブ自身の向き（白上・緑前）。
+ */
+export function CubeView({ hold }: { hold?: { rotation: string; frame: Frame } } = {}) {
   const store = useCubeStore()
   const ref = useRef<HTMLDivElement>(null)
 
@@ -29,7 +33,8 @@ export function CubeView() {
     let queued = 0
     const replace = (pattern: KPattern) => {
       player.alg = ''
-      player.experimentalModel.setupTransformation.set(pattern.experimentalToTransformation())
+      const shown = hold?.rotation ? pattern.applyAlg(hold.rotation) : pattern
+      player.experimentalModel.setupTransformation.set(shown.experimentalToTransformation())
       queued = 0
     }
     replace(store.getSnapshot().pattern)
@@ -41,7 +46,7 @@ export function CubeView() {
         // ストアの状態はこの手を適用済み
         replace(store.getSnapshot().pattern)
       } else {
-        player.experimentalAddMove(update.move)
+        player.experimentalAddMove(hold ? convertMove(hold.frame, update.move) : update.move)
         queued++
       }
     })
@@ -49,7 +54,7 @@ export function CubeView() {
       unsubscribe()
       player.remove()
     }
-  }, [store])
+  }, [store, hold])
 
   return <div className="cube-view" ref={ref} />
 }

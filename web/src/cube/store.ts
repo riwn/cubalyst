@@ -172,6 +172,10 @@ export class CubeStore {
     resolve?.(mac)
   }
 
+  clearError() {
+    this.set({ error: null })
+  }
+
   setStatusMessage(message: string | null) {
     this.set({ statusMessage: message })
   }

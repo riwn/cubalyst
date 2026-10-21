@@ -111,8 +111,12 @@ func TestSettingsAPI(t *testing.T) {
 	if rec := do(t, h, http.MethodPut, "/api/settings", `{"cross_color":"white","hold_bottom":"white","hold_front":"yellow"}`); rec.Code != http.StatusBadRequest {
 		t.Fatalf("invalid hold: %d", rec.Code)
 	}
-	if rec := do(t, h, http.MethodGet, "/api/settings", ""); !strings.Contains(rec.Body.String(), `"cross_color":"white","hold_bottom":"white","hold_front":"red"`) {
+	if rec := do(t, h, http.MethodGet, "/api/settings", ""); !strings.Contains(rec.Body.String(), `"cross_color":"white","hold_bottom":"white","hold_front":"red","inspection":true`) {
 		t.Fatalf("persisted settings: %s", rec.Body)
+	}
+	do(t, h, http.MethodPut, "/api/settings", `{"cross_color":"white","hold_bottom":"white","hold_front":"red","inspection":false}`)
+	if rec := do(t, h, http.MethodGet, "/api/settings", ""); !strings.Contains(rec.Body.String(), `"inspection":false`) {
+		t.Fatalf("inspection off: %s", rec.Body)
 	}
 }
 

@@ -7,7 +7,11 @@ import { SolveSession, type ExerciseSource, type SessionState } from './session'
  * 計測セッションを作って開始する。source が変わるとセッションを作り直す。
  * onSolved は最新の関数が呼ばれる。
  */
-export function useSolveSession(source: ExerciseSource, onSolved: (solve: NewSolve) => void) {
+export function useSolveSession(
+  source: ExerciseSource,
+  onSolved: (solve: NewSolve) => void,
+  opts: { inspection?: boolean } = {},
+) {
   const store = useCubeStore()
   const onSolvedRef = useRef(onSolved)
   useEffect(() => {
@@ -20,6 +24,10 @@ export function useSolveSession(source: ExerciseSource, onSolved: (solve: NewSol
     void s.next()
     return () => s.dispose()
   }, [store, source])
+  const inspection = opts.inspection ?? false
+  useEffect(() => {
+    session?.setInspection(inspection)
+  }, [session, inspection])
   return session
 }
 

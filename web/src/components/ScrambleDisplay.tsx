@@ -28,11 +28,13 @@ export function ScrambleDisplay({ session, state }: { session: SolveSession; sta
           })}
         </p>
       )}
-      {progress && progress.correction.length > 0 && phase === 'scrambling' && (
-        <p className="correction">
-          戻す: <strong>{progress.correction.join(' ')}</strong>
-        </p>
-      )}
+      <div className="correction-slot" aria-live="polite">
+        {progress && progress.correction.length > 0 && phase === 'scrambling' && (
+          <p className="correction">
+            戻す: <strong>{progress.correction.join(' ')}</strong>
+          </p>
+        )}
+      </div>
       <div className="row scramble-actions">
         {(phase === 'scrambling' || phase === 'needSolved') && (
           <button onClick={() => session.forceReady()} title="スクランブルの追跡がうまくいかないときに使います">

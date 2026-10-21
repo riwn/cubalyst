@@ -168,7 +168,7 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
       </div>
 
       {splits.length > 0 && (
-        <div className="replay-stages" aria-label="段階">
+        <div className="replay-stages" aria-label="ステップ">
           {splits.map((s) => {
             const width = total > 0 ? ((s.end_ms - s.start_ms) / total) * 100 : 0
             return (

@@ -1,5 +1,4 @@
 import { useCallback } from 'react'
-import { ConnectionPanel } from '../components/ConnectionPanel'
 import { CubeView } from '../components/CubeView'
 import { MockControls } from '../components/MockControls'
 import { MoveLog } from '../components/MoveLog'
@@ -12,6 +11,7 @@ import { withSplits } from '../solve/cfop'
 import { fullSolveSource } from '../solve/exercises'
 import { useSaveSolve, useSessionState, useSolveList, useSolveSession } from '../solve/hooks'
 import { invert, splitAlg } from '../solve/notation'
+import { useDebug } from '../ui/prefs'
 import type { SessionState } from '../solve/session'
 
 const RECENT = { mode: 'full', limit: 12 } as const
@@ -23,22 +23,24 @@ export function TimerPage() {
   const { save, error: saveError } = useSaveSolve(useCallback(() => reload(), [reload]))
   const store = useCubeStore()
   const { settings } = useSettings()
-  const session = useSolveSession(fullSolveSource, (solve) =>
-    save(withSplits(store.kpuzzle, solve, settings.cross_color)),
+  const session = useSolveSession(
+    fullSolveSource,
+    (solve) => save(withSplits(store.kpuzzle, solve, settings.cross_color)),
+    { inspection: settings.inspection },
   )
   const state = useSessionState(session)
   const { status } = useCubeState()
+  const debug = useDebug()
 
   return (
     <div className="timer-page">
-      <ConnectionPanel />
       {session && state && (
         <>
           <ScrambleDisplay session={session} state={state} />
           <TimerDisplay state={state} />
         </>
       )}
-      {status === 'disconnected' && <p className="muted center">キューブを接続すると計測できます</p>}
+      {status === 'disconnected' && <p className="muted center">右上の「Connect」でキューブを接続すると計測できます</p>}
       {saveError && <p className="error">{saveError}</p>}
       <div className="timer-grid">
         <div>
@@ -49,11 +51,13 @@ export function TimerPage() {
           {state && <MockControls {...mockShortcuts(state)} />}
         </div>
       </div>
-      <details className="debug">
-        <summary>デバッグ情報（回転ログ・facelets）</summary>
-        <MoveLog />
-        <FaceletsInfo />
-      </details>
+      {debug && (
+        <details className="debug" open>
+          <summary>デバッグ情報（回転ログ・facelets）</summary>
+          <MoveLog />
+          <FaceletsInfo />
+        </details>
+      )}
     </div>
   )
 }

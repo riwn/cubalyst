@@ -1,18 +1,13 @@
-// ケース練習の出題。ケースの状態を作り、ソルバーで解いた手順の逆をスクランブルにする。
+// ケースの状態とスクランブルの生成（ステップ練習・手順練習のモックで使う）。
 
 import { Alg } from 'cubing/alg'
 import type { KPattern, KPuzzle } from 'cubing/kpuzzle'
 import { patternToFacelets } from '../cube/facelets'
 import { stageLevel, type CrossColor } from '../solve/cfop'
 import { formatMove, parseMove, splitAlg } from '../solve/notation'
-import type { Exercise, ExerciseSource } from '../solve/session'
 import type { CaseSet } from './data'
 import { applyNormalized, inFrame } from './geometry'
 
-export type PracticeCase = { id: string; set: CaseSet; name: string; alg: string }
-
-const AUF = ['', 'U', 'U2', "U'"]
-const pick = <T,>(xs: T[]): T => xs[Math.floor(Math.random() * xs.length)]
 
 /**
  * ケースの状態（キューブ座標系）。標準の向きで「前後AUF＋手順の逆」を作り、クロス色に合わせて持ち替える。
@@ -43,24 +38,4 @@ export async function scrambleFor(pattern: KPattern): Promise<string> {
   return splitAlg(solution.invert().toString())
     .map((m) => formatMove(parseMove(m)))
     .join(' ')
-}
-
-export function caseExerciseSource(
-  kpuzzle: KPuzzle,
-  cases: PracticeCase[],
-  color: CrossColor,
-): ExerciseSource {
-  return async (): Promise<Exercise> => {
-    if (cases.length === 0) throw new Error('ケースが選ばれていません')
-    const c = pick(cases)
-    const pattern = caseStateInCubeFrame(kpuzzle, c.alg, color, pick(AUF), c.set === 'PLL' ? pick(AUF) : '')
-    return {
-      mode: 'case',
-      scramble: await scrambleFor(pattern),
-      caseId: c.id,
-      label: `${c.set}（ケースは解いた後に表示）`,
-      requireSolvedStart: true,
-      isGoal: caseGoal(c.set, color),
-    }
-  }
 }

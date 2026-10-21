@@ -5,7 +5,7 @@ import { MockConnection } from '../cube/mock'
 import { CubeStore } from '../cube/store'
 import { invert, simplify } from './notation'
 import { ScrambleTracker } from './scramble-tracker'
-import { SolveSession, isSolved, type Exercise } from './session'
+import { SolveSession, inspectionPenalty, isSolved, type Exercise } from './session'
 import { averageOf, effectiveTime, formatTime, rollingAverages } from './stats'
 
 const kpuzzle = await cube3x3x3.kpuzzle()
@@ -95,6 +95,16 @@ describe('stats', () => {
   })
 })
 
+describe('inspectionPenalty', () => {
+  it('follows WCA rules', () => {
+    expect(inspectionPenalty(10_000)).toBe('')
+    expect(inspectionPenalty(15_000)).toBe('')
+    expect(inspectionPenalty(15_001)).toBe('+2')
+    expect(inspectionPenalty(17_000)).toBe('+2')
+    expect(inspectionPenalty(17_001)).toBe('DNF')
+  })
+})
+
 describe('SolveSession with mock cube', () => {
   function setup(exercise: Partial<Exercise> = {}) {
     const store = new CubeStore(kpuzzle)
@@ -154,6 +164,18 @@ describe('SolveSession with mock cube', () => {
     expect(session.getSnapshot().phase).toBe('needSolved')
     mock.turn("R'")
     expect(session.getSnapshot().phase).toBe('scrambling')
+  })
+
+  it('records readyAt and applies no penalty for a quick start with inspection on', async () => {
+    const { session, mock, saved } = setup({ scramble: 'R' })
+    session.setInspection(true)
+    await session.next()
+    mock.turn('R')
+    expect(session.getSnapshot()).toMatchObject({ phase: 'ready', inspection: true })
+    expect(session.getSnapshot().readyAt).not.toBeNull()
+    mock.turn("R'")
+    await flush()
+    expect(saved[0].penalty).toBe('')
   })
 
   it('forceReady skips scramble tracking', async () => {

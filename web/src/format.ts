@@ -1,6 +1,6 @@
 import type { SolveMode } from './api'
 
-export const MODE_LABELS: Record<SolveMode, string> = { full: 'フル', case: 'ケース', step: 'ステップ' }
+export const MODE_LABELS: Record<SolveMode, string> = { full: 'フル', case: '手順', step: 'ステップ' }
 
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('ja-JP', {

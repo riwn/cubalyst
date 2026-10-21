@@ -16,10 +16,12 @@ type Settings struct {
 	// HoldBottom / HoldFront は解くときの持ち方（下の色・前の色）。解法の表記をこの向きに合わせる。
 	HoldBottom string `json:"hold_bottom"`
 	HoldFront  string `json:"hold_front"`
+	// Inspection はフルソルブでWCA方式の15秒インスペクションを使うか。
+	Inspection bool `json:"inspection"`
 }
 
 // Defaults は未設定時の値。
-var Defaults = Settings{CrossColor: "white", HoldBottom: "white", HoldFront: "green"}
+var Defaults = Settings{CrossColor: "white", HoldBottom: "white", HoldFront: "green", Inspection: true}
 
 // Frame は持ち方での記号への変換。
 func (s Settings) Frame() notation.Frame {
@@ -78,6 +80,8 @@ func (st *Store) Get(ctx context.Context) (Settings, error) {
 			s.HoldBottom = v
 		case "hold_front":
 			s.HoldFront = v
+		case "inspection":
+			s.Inspection = v == "1"
 		}
 	}
 	return s, rows.Err()
@@ -93,7 +97,11 @@ func (st *Store) Put(ctx context.Context, s Settings) error {
 		return err
 	}
 	defer tx.Rollback()
-	for k, v := range map[string]string{"cross_color": s.CrossColor, "hold_bottom": s.HoldBottom, "hold_front": s.HoldFront} {
+	inspection := "0"
+	if s.Inspection {
+		inspection = "1"
+	}
+	for k, v := range map[string]string{"cross_color": s.CrossColor, "hold_bottom": s.HoldBottom, "hold_front": s.HoldFront, "inspection": inspection} {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO settings (key, value) VALUES (?, ?)
 			ON CONFLICT (key) DO UPDATE SET value = excluded.value,
 			updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`, k, v); err != nil {

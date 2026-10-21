@@ -54,7 +54,7 @@ export function RecentSolves({ solves, onChange }: { solves: Solve[]; onChange: 
                   <button className={s.penalty === 'DNF' ? 'on' : ''} onClick={() => setPenalty(s, 'DNF')}>
                     DNF
                   </button>
-                  <button onClick={() => remove(s)} title="削除">
+                  <button className="danger" onClick={() => remove(s)} title="削除">
                     ×
                   </button>
                 </td>

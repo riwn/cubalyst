@@ -118,6 +118,8 @@ export type Settings = {
   /** 解くときの持ち方（下の色・前の色）。解法の表記をこの向きに合わせる。 */
   hold_bottom: CrossColor
   hold_front: CrossColor
+  /** フルソルブでWCA方式の15秒インスペクションを使うか。 */
+  inspection: boolean
 }
 
 export function getSettings(): Promise<Settings> {

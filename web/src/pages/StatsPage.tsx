@@ -118,7 +118,7 @@ export function StatsPage() {
         )}
         {mode === 'step' && (
           <label>
-            段階{' '}
+            ステップ{' '}
             <select value={step} onChange={(e) => setStep(e.target.value)}>
               <option value="">すべて</option>
               {stepOptions.map((c) => (
@@ -171,8 +171,8 @@ export function StatsPage() {
 
           {stages.count > 0 && (
             <section className="panel">
-              <h3>段階別（{stages.count}ソルブの平均）</h3>
-              <div className="share-bar" role="img" aria-label="段階ごとの時間の割合">
+              <h3>ステップ別（{stages.count}ソルブの平均）</h3>
+              <div className="share-bar" role="img" aria-label="ステップごとの時間の割合">
                 {GROUPS.map((g) => (
                   <div
                     key={g}
@@ -191,7 +191,7 @@ export function StatsPage() {
               <table className="splits-table">
                 <thead>
                   <tr>
-                    <th className="left">段階</th>
+                    <th className="left">ステップ</th>
                     <th>平均時間</th>
                     <th>割合</th>
                     <th>平均手数</th>

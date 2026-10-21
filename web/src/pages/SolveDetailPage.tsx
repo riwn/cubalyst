@@ -11,6 +11,9 @@ import {
   type Solve,
 } from '../api'
 import { AnalysisPanel } from '../components/AnalysisPanel'
+import { StepShareDonut } from '../components/charts'
+import { ConfirmDialog } from '../ui/Dialog'
+import { KebabMenu } from '../ui/Popover'
 import { SplitsTable } from '../components/SplitsTable'
 import { useCubeStore } from '../cube/hooks'
 import { ReplayPlayer } from '../replay/ReplayPlayer'
@@ -49,6 +52,7 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
   const frame = useHoldFrame()
   const [note, setNote] = useState(solve.note)
   const [message, setMessage] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const setPenalty = async (p: Penalty) => onChange(await updateSolve(solve.id, { penalty: solve.penalty === p ? '' : p }))
   const saveNote = async () => {
@@ -56,14 +60,14 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
     setMessage('メモを保存しました')
   }
   const remove = async () => {
-    if (!confirm('この記録を削除しますか？')) return
+    setConfirmDelete(false)
     await deleteSolve(solve.id)
     navigate('/history')
   }
   const recompute = async () => {
     if (!solve.moves?.length) return
     onChange(await replaceSplits(solve.id, computeSplits(store.kpuzzle, solve.moves, settings.cross_color)))
-    setMessage(`段階を再計算しました（クロス色：${COLOR_LABELS[settings.cross_color]}）`)
+    setMessage(`ステップを再計算しました（クロス色：${COLOR_LABELS[settings.cross_color]}）`)
   }
 
   const moves = solve.moves ?? []
@@ -92,12 +96,31 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
             DNF
           </button>
           <span className="spacer" />
-          <a className="button" href={exportUrl('txt', { ids: [solve.id] })}>
-            テキストで出力
-          </a>
-          <button onClick={remove}>削除</button>
+          <KebabMenu
+            items={[
+              { label: 'テキストで出力', onSelect: () => window.location.assign(exportUrl('txt', { ids: [solve.id] })) },
+              ...(solve.mode === 'full'
+                ? [{ label: 'ステップを再計算', onSelect: () => void recompute() }]
+                : []),
+              'separator',
+              { label: 'この記録を削除', danger: true, onSelect: () => setConfirmDelete(true) },
+            ]}
+          />
         </div>
       </section>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="記録の削除"
+        message={
+          <p>
+            {formatTime(effectiveTime(solve.total_ms, solve.penalty), 3)}（#{solve.id}）の記録を削除します。回転ログ・ステップ・解析結果もすべて消え、元に戻せません。
+          </p>
+        }
+        confirmLabel="削除する"
+        danger
+        onConfirm={() => void remove()}
+        onCancel={() => setConfirmDelete(false)}
+      />
 
       <section className="panel">
         <h3>再生</h3>
@@ -110,10 +133,8 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
       </section>
 
       <section className="panel">
-        <div className="row">
-          <h3>段階</h3>
-          {solve.mode === 'full' && <button onClick={recompute}>段階を再計算</button>}
-        </div>
+        <h3>ステップ</h3>
+        {(solve.splits ?? []).length > 0 && <StepShareDonut splits={solve.splits ?? []} totalMs={solve.total_ms} />}
         <SplitsTable splits={solve.splits ?? []} moves={moves} totalMs={solve.total_ms} />
         {(solve.splits ?? []).length === 0 && moves.length > 0 && (
           <p className="alg">{moves.map((m) => convertMove(frame, m.move)).join(' ')}</p>
@@ -138,6 +159,7 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
         load={() => listSolveAnalyses(solve.id)}
         run={() => analyzeSolve(solve.id)}
         reloadKey={solve.id}
+        confirmRerun
       />
     </div>
   )

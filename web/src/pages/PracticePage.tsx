@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { CasePractice } from './CasePractice'
+import { AlgDrillPage } from './AlgDrillPage'
 import { StepPractice } from './StepPractice'
 
 type Mode = 'case' | 'step'
@@ -15,13 +15,13 @@ export function PracticePage() {
           フルソルブ（タイマー）
         </Link>
         <button className={mode === 'case' ? 'on-accent' : ''} onClick={() => setMode('case')}>
-          ケース練習
+          手順練習
         </button>
         <button className={mode === 'step' ? 'on-accent' : ''} onClick={() => setMode('step')}>
           ステップ練習
         </button>
       </div>
-      {mode === 'case' && <CasePractice />}
+      {mode === 'case' && <AlgDrillPage />}
       {mode === 'step' && <StepPractice />}
     </div>
   )

@@ -4,7 +4,6 @@ import { useCubeState } from '../cube/hooks'
 import { useSaveSolve, useSessionState, useSolveSession } from '../solve/hooks'
 import { invert, splitAlg } from '../solve/notation'
 import type { ExerciseSource } from '../solve/session'
-import { ConnectionPanel } from './ConnectionPanel'
 import { CubeView } from './CubeView'
 import { MockControls } from './MockControls'
 import { ScrambleDisplay } from './ScrambleDisplay'
@@ -46,14 +45,13 @@ export function PracticeRunner({
 
   return (
     <div className="practice-runner">
-      <ConnectionPanel />
       {session && state && (
         <>
           <ScrambleDisplay session={session} state={state} />
           <TimerDisplay state={state} />
         </>
       )}
-      {status === 'disconnected' && <p className="muted center">キューブを接続すると練習できます</p>}
+      {status === 'disconnected' && <p className="muted center">右上の「Connect」でキューブを接続すると練習できます</p>}
       {error && <p className="error">{error}</p>}
       <div className="timer-grid">
         <div>

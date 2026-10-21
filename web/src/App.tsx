@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { NavLink, Route, Routes } from 'react-router'
-import { HealthStatus } from './HealthStatus'
+import { SystemMenu } from './HealthStatus'
+import { CubeConnectionControl, CubeNotices } from './components/ConnectionPanel'
 import { CubeStoreProvider } from './cube/CubeStoreProvider'
 import { HistoryPage } from './pages/HistoryPage'
 import { PracticePage } from './pages/PracticePage'
@@ -29,21 +30,25 @@ function Placeholder({ title }: { title: string }) {
 
 export default function App() {
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Cubalyst</h1>
-        <nav>
-          {pages.map((p) => (
-            <NavLink key={p.path} to={p.path} end={p.end}>
-              {p.label}
-            </NavLink>
-          ))}
-        </nav>
-        <HealthStatus />
-      </header>
-      <main>
-        <SettingsProvider>
-          <CubeStoreProvider>
+    <SettingsProvider>
+      <CubeStoreProvider>
+        <div className="app">
+          <header className="app-header">
+            <h1>Cubalyst</h1>
+            <nav>
+              {pages.map((p) => (
+                <NavLink key={p.path} to={p.path} end={p.end}>
+                  {p.label}
+                </NavLink>
+              ))}
+            </nav>
+            <div className="header-right">
+              <CubeConnectionControl />
+              <SystemMenu />
+            </div>
+          </header>
+          <CubeNotices />
+          <main>
             <Routes>
               {pages.map((p) => (
                 <Route key={p.path} path={p.path} element={p.element ?? <Placeholder title={p.label} />} />
@@ -51,9 +56,9 @@ export default function App() {
               <Route path="/history/:id" element={<SolveDetailPage />} />
               <Route path="*" element={<Placeholder title="ページが見つかりません" />} />
             </Routes>
-          </CubeStoreProvider>
-        </SettingsProvider>
-      </main>
-    </div>
+          </main>
+        </div>
+      </CubeStoreProvider>
+    </SettingsProvider>
   )
 }

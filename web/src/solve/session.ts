@@ -8,6 +8,7 @@
 
 import type { KPattern } from 'cubing/kpuzzle'
 import type { NewSolve, SolveMode } from '../api'
+import type { Penalty } from './stats'
 import type { LoggedMove, CubeStore } from '../cube/store'
 import { fitTimestamps } from '../cube/timestamps'
 import { ScrambleTracker, type ScrambleProgress } from './scramble-tracker'
@@ -30,12 +31,29 @@ export type ExerciseSource = () => Promise<Exercise>
 
 export type SessionPhase = 'generating' | 'needSolved' | 'scrambling' | 'ready' | 'running'
 
+/** WCAのインスペクション：15秒を超えたら+2、17秒を超えたらDNF。 */
+export const INSPECTION_MS = 15_000
+export const INSPECTION_DNF_MS = 17_000
+
+/** インスペクション開始から最初の回転までの時間に対するペナルティ。 */
+export function inspectionPenalty(elapsedMs: number): Penalty {
+  if (elapsedMs > INSPECTION_DNF_MS) return 'DNF'
+  if (elapsedMs > INSPECTION_MS) return '+2'
+  return ''
+}
+
 export type SessionState = {
   phase: SessionPhase
   exercise: Exercise | null
   progress: ScrambleProgress | null
   /** 計測開始（最初の回転を受け取った）時刻。performance.now() 基準。 */
   startedAt: number | null
+  /** 計測待ち（スクランブル完了）になった時刻。インスペクションの起点。 */
+  readyAt: number | null
+  /** インスペクションを使うか。 */
+  inspection: boolean
+  /** インスペクション超過によるペナルティ（計測開始時に確定）。 */
+  inspectionPenalty: Penalty
   /** 計測中の手数。 */
   moveCount: number
   /** 直前に終わったソルブ。 */
@@ -53,6 +71,9 @@ export class SolveSession {
     exercise: null,
     progress: null,
     startedAt: null,
+    readyAt: null,
+    inspection: false,
+    inspectionPenalty: '',
     moveCount: 0,
     last: null,
     error: null,
@@ -94,6 +115,11 @@ export class SolveSession {
     for (const l of this.listeners) l()
   }
 
+  /** インスペクションの有無を切り替える（フルソルブのみで使う）。 */
+  setInspection(on: boolean) {
+    if (this.state.inspection !== on) this.set({ inspection: on })
+  }
+
   dispose() {
     this.disposed = true
     this.unsubscribes.forEach((u) => u())
@@ -105,7 +131,16 @@ export class SolveSession {
     const gen = ++this.generation
     this.tracker = null
     this.solveMoves = []
-    this.set({ phase: 'generating', exercise: null, progress: null, startedAt: null, moveCount: 0, error: null })
+    this.set({
+      phase: 'generating',
+      exercise: null,
+      progress: null,
+      startedAt: null,
+      readyAt: null,
+      inspectionPenalty: '',
+      moveCount: 0,
+      error: null,
+    })
     let exercise: Exercise
     try {
       exercise = await this.source()
@@ -121,8 +156,17 @@ export class SolveSession {
   /** スクランブル追跡を飛ばして計測待ちにする（追跡がうまくいかないとき用）。 */
   forceReady() {
     if (this.state.phase === 'scrambling' || this.state.phase === 'needSolved') {
-      this.set({ phase: 'ready' })
+      this.setReady()
     }
+  }
+
+  private setReady(patch: Partial<SessionState> = {}) {
+    this.set({ ...patch, phase: 'ready', readyAt: performance.now() })
+  }
+
+  private updateScrambling(progress: ScrambleProgress) {
+    if (progress.complete) this.setReady({ progress })
+    else this.set({ progress, phase: 'scrambling' })
   }
 
   /** 計測中のソルブを破棄して次の出題へ。 */
@@ -140,8 +184,7 @@ export class SolveSession {
       return
     }
     this.tracker = new ScrambleTracker(exercise.scramble, pattern)
-    const progress = this.tracker.progress
-    this.set({ phase: progress.complete ? 'ready' : 'scrambling', progress })
+    this.updateScrambling(this.tracker.progress)
   }
 
   private handleMove(move: LoggedMove, pattern: KPattern) {
@@ -149,16 +192,21 @@ export class SolveSession {
       case 'needSolved':
         if (isSolved(pattern)) this.beginScramble()
         break
-      case 'scrambling': {
-        const progress = this.tracker!.onMove(move.move, pattern)
-        this.set({ progress, phase: progress.complete ? 'ready' : 'scrambling' })
+      case 'scrambling':
+        this.updateScrambling(this.tracker!.onMove(move.move, pattern))
         break
-      }
-      case 'ready':
+      case 'ready': {
         this.solveMoves = [move]
-        this.set({ phase: 'running', startedAt: move.receivedAt, moveCount: 1 })
+        const elapsed = this.state.readyAt == null ? 0 : move.receivedAt - this.state.readyAt
+        this.set({
+          phase: 'running',
+          startedAt: move.receivedAt,
+          moveCount: 1,
+          inspectionPenalty: this.state.inspection ? inspectionPenalty(elapsed) : '',
+        })
         this.checkGoal(pattern)
         break
+      }
       case 'running':
         this.solveMoves.push(move)
         this.set({ moveCount: this.solveMoves.length })
@@ -176,8 +224,7 @@ export class SolveSession {
         // ケース・ステップ練習では目標状態が変わってしまうので出題し直す
         this.beginScramble()
       } else {
-        const progress = this.tracker.onReplace(pattern)
-        this.set({ progress, phase: progress.complete ? 'ready' : 'scrambling' })
+        this.updateScrambling(this.tracker.onReplace(pattern))
       }
     } else if (phase === 'running') {
       this.checkGoal(pattern)
@@ -192,7 +239,7 @@ export class SolveSession {
       mode: exercise.mode,
       solved_at: new Date().toISOString(),
       total_ms: Math.max(0, Math.round(fitted[fitted.length - 1]?.fittedTimestamp ?? 0)),
-      penalty: '',
+      penalty: this.state.inspectionPenalty,
       scramble: exercise.scramble,
       moves: fitted.map((m) => ({
         move: m.move,

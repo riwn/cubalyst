@@ -52,7 +52,7 @@ export function StepPractice() {
   return (
     <div className="step-practice">
       <section className="panel row">
-        <span>段階</span>
+        <span>ステップ</span>
         {(['random', ...STEPS] as const).map((s) => (
           <button key={s} className={step === s ? 'on-accent' : ''} onClick={() => setStep(s)}>
             {s === 'random' ? 'ランダム' : STEP_LABELS[s]}
@@ -85,7 +85,7 @@ export function StepPractice() {
               <table className="splits-table">
                 <thead>
                   <tr>
-                    <th className="left">段階</th>
+                    <th className="left">ステップ</th>
                     <th>回数</th>
                     <th>平均</th>
                     <th>ao5</th>

@@ -41,7 +41,7 @@ export function SettingsPage() {
       const n = await recomputeAllSplits(store.kpuzzle, settings.cross_color, (done, total) =>
         setProgress(`再計算中… ${done} / ${total}`),
       )
-      setProgress(`${n}件の段階を再計算しました`)
+      setProgress(`${n}件のステップを再計算しました`)
     } catch (err) {
       setError(String(err))
     }
@@ -65,7 +65,7 @@ export function SettingsPage() {
     <div className="settings-page">
       <section className="panel">
         <h3>クロス色</h3>
-        <p className="muted small">CFOPの段階判定に使います（GAN標準配色：白の反対が黄、緑の反対が青、赤の反対が橙）。</p>
+        <p className="muted small">CFOPのステップの判定に使います（GAN標準配色：白の反対が黄、緑の反対が青、赤の反対が橙）。</p>
         <div className="row">
           {CROSS_COLORS.map((c) => (
             <label key={c} className="radio">
@@ -81,9 +81,24 @@ export function SettingsPage() {
         </div>
         <p className="muted small">変更は以降のソルブに適用されます。過去の記録に反映するには再計算してください。</p>
         <div className="row">
-          <button onClick={recompute}>全ソルブの段階を再計算</button>
+          <button onClick={recompute}>全ソルブのステップを再計算</button>
           {progress && <span className="muted">{progress}</span>}
         </div>
+      </section>
+
+      <section className="panel">
+        <h3>インスペクション</h3>
+        <label className="radio">
+          <input
+            type="checkbox"
+            checked={settings.inspection}
+            onChange={(e) => update({ ...settings, inspection: e.target.checked }).catch((err) => setError(String(err)))}
+          />
+          フルソルブでWCA方式の15秒インスペクションを使う
+        </label>
+        <p className="muted small">
+          スクランブルが完了した時点から数え始めます。最初の回転が15秒を超えると+2、17秒を超えるとDNFが自動で付きます。
+        </p>
       </section>
 
       <section className="panel">

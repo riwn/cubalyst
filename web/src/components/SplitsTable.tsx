@@ -11,12 +11,12 @@ function tps(moves: number, ms: number): string {
 /** 段階ごとの時間・手数・TPSと、その段階の解法（設定の持ち方での記号）。 */
 export function SplitsTable({ splits, moves, totalMs }: { splits: Split[]; moves?: SolveMove[]; totalMs: number }) {
   const frame = useHoldFrame()
-  if (splits.length === 0) return <p className="muted">段階の記録がありません</p>
+  if (splits.length === 0) return <p className="muted">ステップの記録がありません</p>
   return (
     <table className="splits-table">
       <thead>
         <tr>
-          <th>段階</th>
+          <th>ステップ</th>
           <th>経過</th>
           <th>所要</th>
           <th>割合</th>
