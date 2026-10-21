@@ -77,7 +77,8 @@ func TestTools(t *testing.T) {
 	}
 
 	out, isErr := call(t, cs, "list_solves", nil)
-	if isErr || !strings.Contains(out, "全2件") || !strings.Contains(out, "#2") || !strings.Contains(out, "3.00  3手  Cross 1.00 / F2L 2.00") {
+	if isErr || !strings.Contains(out, "全2件") || !strings.Contains(out, "#2") || !strings.Contains(out, "3.00  3手  Cross 1.00 / F2L 2.00") ||
+		!strings.Contains(out, "最後の傾向分析: まだなし") || strings.Count(out, "未解析") != 2 {
 		t.Fatalf("list_solves: %s", out)
 	}
 
@@ -104,6 +105,25 @@ func TestTools(t *testing.T) {
 	}
 	if out, isErr = call(t, cs, "save_analysis", map[string]any{"kind": "solve", "solve_id": 1, "result": ""}); !isErr {
 		t.Fatalf("save empty: %s", out)
+	}
+
+	// 解析済みかどうかと、最後の傾向分析が一覧に出る
+	out, _ = call(t, cs, "list_solves", nil)
+	lines := strings.Split(out, "\n")
+	if !strings.Contains(out, `最後の傾向分析: `) || !strings.Contains(out, `"limit":10`) {
+		t.Fatalf("list_solves trend: %s", out)
+	}
+	var solve1, solve2 string
+	for _, l := range lines {
+		switch {
+		case strings.HasPrefix(l, "#1 "):
+			solve1 = l
+		case strings.HasPrefix(l, "#2 "):
+			solve2 = l
+		}
+	}
+	if !strings.Contains(solve1, "解析済み（1回") || !strings.Contains(solve2, "未解析") {
+		t.Fatalf("list_solves analyzed marks:\n%s", out)
 	}
 
 	out, _ = call(t, cs, "list_analyses", map[string]any{"solve_id": 1})

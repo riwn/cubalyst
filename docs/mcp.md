@@ -21,7 +21,7 @@ Claude Code / Claude Desktop
 
 | ツール | 内容 |
 |---|---|
-| `list_solves` | ソルブの一覧（ID、日時、タイム、手数、Cross / F2L / OLL / PLL ごとの時間） |
+| `list_solves` | ソルブの一覧（ID、日時、タイム、手数、Cross / F2L / OLL / PLL ごとの時間、解析済みかどうか）と、最後の傾向分析の日時 |
 | `get_solve` | 1回のソルブの解析用データ（アプリ内の解析で Claude に渡しているものと同じ）。ID を省くと直近のフルソルブ |
 | `get_trend` | 直近 N 件の傾向分析用データ |
 | `list_analyses` | 保存済みの解析結果 |
