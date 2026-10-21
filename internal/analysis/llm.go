@@ -40,11 +40,14 @@ type Claude struct {
 	client anthropic.Client
 	model  string
 	effort anthropic.BetaOutputConfigEffort
+	// workspaceID はワークスペースに紐付いていないAPIキーのとき、使うワークスペースを指定する。
+	workspaceID string
 }
 
 // NewClaudeFromEnv は環境変数から設定を読む。ANTHROPIC_API_KEY が無ければ ErrNotConfigured。
 //
-//	ANTHROPIC_API_KEY（必須） / CUBALYST_CLAUDE_MODEL（既定 claude-opus-5-5） / CUBALYST_CLAUDE_EFFORT（既定 high）
+//	ANTHROPIC_API_KEY（必須） / ANTHROPIC_WORKSPACE_ID（キーがワークスペースに紐付いていない場合）
+//	CUBALYST_CLAUDE_MODEL（既定 claude-opus-5-5） / CUBALYST_CLAUDE_EFFORT（既定 high）
 func NewClaudeFromEnv() (*Claude, error) {
 	if os.Getenv("ANTHROPIC_API_KEY") == "" {
 		return nil, ErrNotConfigured
@@ -56,7 +59,12 @@ func NewClaudeFromEnv() (*Claude, error) {
 	default:
 		return nil, fmt.Errorf("CUBALYST_CLAUDE_EFFORT %q は low/medium/high/xhigh/max のいずれかにしてください", effort)
 	}
-	return &Claude{client: anthropic.NewClient(), model: model, effort: effort}, nil
+	return &Claude{
+		client:      anthropic.NewClient(),
+		model:       model,
+		effort:      effort,
+		workspaceID: os.Getenv("ANTHROPIC_WORKSPACE_ID"),
+	}, nil
 }
 
 func envOr(key, def string) string {
@@ -71,7 +79,7 @@ func (c *Claude) Model() string { return c.model }
 // Complete は1回のリクエストで解析結果を得る。
 // 安全分類による拒否に備えて、サーバー側フォールバック（fallbacks: "default"）を有効にしている。
 func (c *Claude) Complete(ctx context.Context, system, prompt string) (Completion, error) {
-	resp, err := c.client.Beta.Messages.New(ctx, anthropic.BetaMessageNewParams{
+	params := anthropic.BetaMessageNewParams{
 		Model:        anthropic.Model(c.model),
 		MaxTokens:    maxTokens,
 		System:       []anthropic.BetaTextBlockParam{{Text: system}},
@@ -79,7 +87,11 @@ func (c *Claude) Complete(ctx context.Context, system, prompt string) (Completio
 		OutputConfig: anthropic.BetaOutputConfigParam{Effort: c.effort},
 		Fallbacks:    anthropic.BetaFallbacksParamUnion{OfDefault: constant.ValueOf[constant.Default]()},
 		Betas:        []anthropic.AnthropicBeta{anthropic.AnthropicBetaServerSideFallback2026_07_01},
-	})
+	}
+	if c.workspaceID != "" {
+		params.WorkspaceID = anthropic.String(c.workspaceID)
+	}
+	resp, err := c.client.Beta.Messages.New(ctx, params)
 	if err != nil {
 		var apierr *anthropic.Error
 		if errors.As(err, &apierr) {

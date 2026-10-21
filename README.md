@@ -118,6 +118,7 @@ ANTHROPIC_API_KEY=sk-ant-... make dev
 | `-db` | `CUBALYST_DB` | `./data/cubalyst.db` | SQLiteファイルのパス |
 | `-static` | `CUBALYST_STATIC` | `./web/dist` | ビルド済みフロントエンドのディレクトリ |
 | — | `ANTHROPIC_API_KEY` | — | Claude APIキー（未設定なら解析機能だけ無効） |
+| — | `ANTHROPIC_WORKSPACE_ID` | — | APIキーがワークスペースに紐付いていない場合に、使うワークスペースのID（`wrkspc_...`） |
 | — | `CUBALYST_CLAUDE_MODEL` | `claude-opus-5-5` | 解析に使うモデル |
 | — | `CUBALYST_CLAUDE_EFFORT` | `high` | effort（low / medium / high / xhigh / max） |
 | — | `CUBALYST_CLAUDE_MOCK` | — | `1` で解析をモック応答にする（開発用） |

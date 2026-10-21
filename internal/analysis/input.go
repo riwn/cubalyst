@@ -460,7 +460,9 @@ func caseTable(list []solves.Solve) string {
 	for id := range byCase {
 		ids = append(ids, id)
 	}
-	sort.Slice(ids, func(a, b int) bool { return byCase[ids[a]].sum/float64(byCase[ids[a]].n) > byCase[ids[b]].sum/float64(byCase[ids[b]].n) })
+	sort.Slice(ids, func(a, b int) bool {
+		return byCase[ids[a]].sum/float64(byCase[ids[a]].n) > byCase[ids[b]].sum/float64(byCase[ids[b]].n)
+	})
 	var b strings.Builder
 	b.WriteString("| ケース | 回数 | 平均 |\n|---|---|---|\n")
 	for _, id := range ids {
