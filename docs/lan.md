@@ -27,16 +27,20 @@ Cubalyst 自体は `127.0.0.1` で待ち受けたままです。LAN に出てい
 
 ## 1. Cubalyst を常駐させる
 
-リポジトリで次を実行します（sudo は要りません）。ビルドして、systemd のユーザーサービス `cubalyst` として登録・起動します。
+リポジトリで次を実行します（sudo は要りません）。GitHub の main を、開発用のリポジトリとは別の場所（`~/deploy/cubalyst`）に取り出してビルドし、systemd のユーザーサービス `cubalyst` として登録・起動します。
 
 ```
-deploy/install-service.sh
+deploy/release.sh
 ```
 
-- 待ち受けは `127.0.0.1:8090` です。開発用の `make dev`（:8080 / :5173）と同時に動かせます。どちらも同じDB（`data/cubalyst.db`）を使います。
+- 作業中のファイルではなく、コミット済みの版（既定は `origin/main`）をビルドします。開発中に `make build` などをしても、動いている Cubalyst は変わりません。本番に出すのは、`deploy/release.sh` を実行したときだけです。
+- 別の版を出すときは `deploy/release.sh <ブランチ・タグ・コミット>`、ひとつ前の版に戻すときは `deploy/release.sh --rollback`、動いている版を見るときは `deploy/release.sh --status` です。
+- 新しい版が応答しなかったときは、自動で前の版に戻します。ビルド済みの版は、新しい方から3つ残します。
+- 本番の DB は `~/deploy/cubalyst/data/cubalyst.db` です。最初にデプロイしたときだけ、リポジトリの `data/cubalyst.db` をコピーして作ります。以後、開発用の DB（リポジトリの `data/`）と本番の DB は別々です。
+- 待ち受けは `127.0.0.1:8090` です。開発用の `make dev`（:8080 / :5173）と同時に動かせます。
 - Claude による解析を使う場合は、`~/.config/cubalyst/env` に `ANTHROPIC_API_KEY=sk-ant-...` のように1行ずつ書き、`systemctl --user restart cubalyst` で再起動します。
 - 状態は `systemctl --user status cubalyst`、ログは `journalctl --user -u cubalyst` で見られます。
-- 更新するときは、`git pull` のあと、もう一度 `deploy/install-service.sh` を実行します。
+- デプロイ先は `CUBALYST_DEPLOY_DIR`、待ち受けは `CUBALYST_PROD_ADDR` で変えられます。
 
 ユーザーサービスは、そのままではログアウトすると止まります。ログインしていないとき（OS起動直後を含む）も動かすには、次を一度だけ実行します。
 
@@ -121,6 +125,7 @@ https://cubalyst.server.home.arpa {
 
 ```
 systemctl --user disable --now cubalyst
+rm -rf ~/deploy/cubalyst   # 本番の DB も消えるので、残すなら先に data/ を退避する
 sudo ufw delete allow from 192.168.1.0/24 to 192.168.1.10 port 443 proto tcp
 sudo systemctl disable --now caddy
 ```

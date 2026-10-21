@@ -1,15 +1,18 @@
 # Cubalyst を常駐させる systemd のユーザーサービス。
-# deploy/install-service.sh が @REPO@ と @ADDR@ を置き換えて
+# deploy/release.sh が @DEPLOY@ と @ADDR@ を置き換えて
 # ~/.config/systemd/user/cubalyst.service に置く。直接は編集しない。
+#
+# 開発用のリポジトリではなく、デプロイ先（@DEPLOY@）の current を動かす。
+# そのため、開発中に make build などをしても、動いている Cubalyst は変わらない。
 [Unit]
 Description=Cubalyst（スマートキューブの記録・解析）
 After=network.target
 
 [Service]
-WorkingDirectory=@REPO@
+WorkingDirectory=@DEPLOY@/current
 # Claude の APIキーなど（無くてもよい）。KEY=VALUE を1行ずつ書く
 EnvironmentFile=-%h/.config/cubalyst/env
-ExecStart=@REPO@/bin/cubalyst -addr @ADDR@
+ExecStart=@DEPLOY@/current/bin/cubalyst -addr @ADDR@ -db @DEPLOY@/data/cubalyst.db -static @DEPLOY@/current/web/dist
 Restart=on-failure
 RestartSec=3
 

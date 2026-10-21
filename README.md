@@ -209,7 +209,7 @@ cd web && npm run gen:cases
 
 ## バックアップ
 
-DBは単一ファイルなので、サーバーを止めてから `data/cubalyst.db` をコピーするだけです。
+DBは単一ファイルなので、サーバーを止めてから `data/cubalyst.db` をコピーするだけです。`deploy/release.sh` で常駐させている場合、本番の DB は `~/deploy/cubalyst/data/cubalyst.db` です（`systemctl --user stop cubalyst` で止めてからコピーします）。
 （WALモードのため、起動中は `cubalyst.db-wal` / `cubalyst.db-shm` も存在します。停止すると本体ファイルに統合されます。）
 
 ## ライセンス
