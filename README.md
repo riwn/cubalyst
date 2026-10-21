@@ -199,3 +199,9 @@ cd web && npm run gen:cases
 
 DBは単一ファイルなので、サーバーを止めてから `data/cubalyst.db` をコピーするだけです。
 （WALモードのため、起動中は `cubalyst.db-wal` / `cubalyst.db-shm` も存在します。停止すると本体ファイルに統合されます。）
+
+## ライセンス
+
+[MIT License](LICENSE) です。
+
+依存しているライブラリやフォントは、それぞれのライセンスに従います。たとえば、cubing.js は MPL-2.0 または GPL-3.0-or-later、同梱しているフォント（Saira Semi Condensed、BIZ UDPゴシック）は SIL Open Font License 1.1 です。
