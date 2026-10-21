@@ -28,7 +28,8 @@ const Instructions = `Cubalyst は、スマートキューブで記録したル�
 このサーバーのツールで、ソルブの記録を読み、解析結果をアプリに保存できます。
 
 解析を頼まれたときの流れ:
-1. 対象を決める。「直近のソルブ」なら get_solve を solve_id なしで呼ぶ。どれか分からなければ list_solves で一覧を見る
+1. 対象を決める。ソルブの ID や「直近のソルブ」のように1つに決まるなら、そのまま進む（直近なら get_solve を solve_id なしで呼ぶ）。
+   決まらないときは、解析を始める前に list_solves の一覧（解析済みかどうかも出る）を見せて、どれを解析するか（または傾向分析か）を選んでもらう
 2. 単一ソルブは get_solve、傾向は get_trend で入力データを取る（必要なら list_analyses で過去の解析も見る）
 3. 下の「解析の前提と出力」に沿って解析する
 4. 保存を頼まれたとき、または解析を頼まれたときは save_analysis で保存する。保存した結果はアプリの画面に出る
@@ -98,7 +99,7 @@ func New(c *Client) *mcp.Server {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_solves",
-		Description: "ソルブの一覧を新しい順に返す（ID、日時、タイム、手数、CFOP の段階ごとの時間）。解析の対象を探すときに使う。",
+		Description: "ソルブの一覧を新しい順に返す（ID、日時、タイム、手数、CFOP の段階ごとの時間、解析済みかどうか）。最後の傾向分析の日時も返す。解析の対象を選んでもらうときに使う。",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, t.listSolves)
 	mcp.AddTool(s, &mcp.Tool{
@@ -186,17 +187,38 @@ func (t tools) listSolves(ctx context.Context, _ *mcp.CallToolRequest, a listSol
 	if len(res.Solves) == 0 {
 		return text(fmt.Sprintf("%s のソルブはありません（全%d件）", a.Mode, res.Total)), nil, nil
 	}
+	var done []analysis.Analysis
+	if err := t.c.do(ctx, http.MethodGet, "/api/analyses", url.Values{"kind": {"solve"}, "limit": {"0"}}, nil, &done); err != nil {
+		return nil, nil, err
+	}
+	bySolve := map[int64][]analysis.Analysis{} // 新しい順
+	for _, an := range done {
+		if an.SolveID != nil {
+			bySolve[*an.SolveID] = append(bySolve[*an.SolveID], an)
+		}
+	}
+	var trend []analysis.Analysis
+	if err := t.c.do(ctx, http.MethodGet, "/api/analyses", url.Values{"kind": {"trend"}, "limit": {"1"}}, nil, &trend); err != nil {
+		return nil, nil, err
+	}
+
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s のソルブ 全%d件のうち %d〜%d件目（新しい順）\n\n", a.Mode, res.Total, a.Offset+1, a.Offset+len(res.Solves))
+	fmt.Fprintf(&b, "%s のソルブ 全%d件のうち %d〜%d件目（新しい順）\n", a.Mode, res.Total, a.Offset+1, a.Offset+len(res.Solves))
+	if len(trend) > 0 {
+		fmt.Fprintf(&b, "最後の傾向分析: %s（%s）\n", trend[0].CreatedAt.Local().Format("2006-01-02 15:04"), string(trend[0].Params))
+	} else {
+		b.WriteString("最後の傾向分析: まだなし\n")
+	}
+	b.WriteByte('\n')
 	for _, s := range res.Solves {
-		b.WriteString(solveLine(s))
+		b.WriteString(solveLine(s, bySolve[s.ID]))
 		b.WriteByte('\n')
 	}
 	return text(b.String()), nil, nil
 }
 
-// solveLine はソルブ1件を1行で表す。
-func solveLine(s solves.Solve) string {
+// solveLine はソルブ1件を1行で表す。analyses はそのソルブの解析結果（新しい順）。
+func solveLine(s solves.Solve, analyses []analysis.Analysis) string {
 	parts := []string{fmt.Sprintf("#%d", s.ID), s.SolvedAt.Local().Format("2006-01-02 15:04"), formatResult(s.TotalMS, s.Penalty), fmt.Sprintf("%d手", len(s.Moves))}
 	if s.CaseID != nil {
 		parts = append(parts, "ケース "+*s.CaseID)
@@ -209,6 +231,11 @@ func solveLine(s solves.Solve) string {
 	}
 	if s.Note != "" {
 		parts = append(parts, "メモ: "+s.Note)
+	}
+	if len(analyses) > 0 {
+		parts = append(parts, fmt.Sprintf("解析済み（%d回、最後 %s）", len(analyses), analyses[0].CreatedAt.Local().Format("01-02 15:04")))
+	} else {
+		parts = append(parts, "未解析")
 	}
 	return strings.Join(parts, "  ")
 }
