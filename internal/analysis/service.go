@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"cubalyst/internal/settings"
@@ -55,45 +56,43 @@ func (s *Service) Configured() (bool, string) {
 	return true, s.llm.Model()
 }
 
-// AnalyzeSolve は単一ソルブを解析して保存する。
-func (s *Service) AnalyzeSolve(ctx context.Context, id int64) (Analysis, error) {
-	if s.llm == nil {
-		return Analysis{}, ErrNotConfigured
-	}
+// 解析を頼むときの指示（入力データのあとに付ける）。
+const (
+	SolveRequest = "このソルブを解析し、改善点をコメントしてください。"
+	TrendRequest = "この傾向を分析し、伸びしろの大きい段階と、これからの練習方針を提案してください。"
+)
+
+// SolveInput は単一ソルブの解析に渡す入力データを作る。
+func (s *Service) SolveInput(ctx context.Context, id int64) (string, error) {
 	solve, err := s.solves.Get(ctx, id)
 	if err != nil {
-		return Analysis{}, err
+		return "", err
 	}
 	recent, _, err := s.solves.List(ctx, solves.Filter{Mode: solves.ModeFull, Limit: 50, IncludeMoves: true, IncludeSplits: true})
 	if err != nil {
-		return Analysis{}, err
+		return "", err
 	}
 	st, err := s.settings.Get(ctx)
 	if err != nil {
-		return Analysis{}, err
+		return "", err
 	}
-	input := SolveInput(solve, recent, st)
-	prompt := input + "\n\nこのソルブを解析し、改善点をコメントしてください。"
-	return s.run(ctx, "solve", &id, json.RawMessage(`{}`), input, prompt)
+	return SolveInput(solve, recent, st), nil
 }
 
-// AnalyzeTrend は直近N件の傾向を分析して保存する。
-func (s *Service) AnalyzeTrend(ctx context.Context, p TrendParams) (Analysis, error) {
-	if s.llm == nil {
-		return Analysis{}, ErrNotConfigured
-	}
+// TrendInput は直近N件の傾向分析に渡す入力データを作る。p は既定値を埋めて返す。
+func (s *Service) TrendInput(ctx context.Context, p TrendParams) (string, TrendParams, error) {
 	if p.Mode == "" {
 		p.Mode = solves.ModeFull
 	}
 	if p.Limit <= 0 || p.Limit > 1000 {
-		return Analysis{}, errors.New("limit は1〜1000で指定してください")
+		return "", p, errors.New("limit は1〜1000で指定してください")
 	}
 	list, _, err := s.solves.List(ctx, solves.Filter{Mode: p.Mode, Limit: p.Limit, IncludeMoves: true, IncludeSplits: true})
 	if err != nil {
-		return Analysis{}, err
+		return "", p, err
 	}
 	if len(list) == 0 {
-		return Analysis{}, errors.New("対象のソルブがありません")
+		return "", p, errors.New("対象のソルブがありません")
 	}
 	// List は新しい順なので古い順にする
 	for i, j := 0, len(list)-1; i < j; i, j = i+1, j-1 {
@@ -101,12 +100,74 @@ func (s *Service) AnalyzeTrend(ctx context.Context, p TrendParams) (Analysis, er
 	}
 	st, err := s.settings.Get(ctx)
 	if err != nil {
+		return "", p, err
+	}
+	return TrendInput(list, p.Mode, st), p, nil
+}
+
+// AnalyzeSolve は単一ソルブを解析して保存する。
+func (s *Service) AnalyzeSolve(ctx context.Context, id int64) (Analysis, error) {
+	if s.llm == nil {
+		return Analysis{}, ErrNotConfigured
+	}
+	input, err := s.SolveInput(ctx, id)
+	if err != nil {
 		return Analysis{}, err
 	}
-	input := TrendInput(list, p.Mode, st)
-	prompt := input + "\n\nこの傾向を分析し、伸びしろの大きい段階と、これからの練習方針を提案してください。"
+	return s.run(ctx, "solve", &id, json.RawMessage(`{}`), input, input+"\n\n"+SolveRequest)
+}
+
+// AnalyzeTrend は直近N件の傾向を分析して保存する。
+func (s *Service) AnalyzeTrend(ctx context.Context, p TrendParams) (Analysis, error) {
+	if s.llm == nil {
+		return Analysis{}, ErrNotConfigured
+	}
+	input, p, err := s.TrendInput(ctx, p)
+	if err != nil {
+		return Analysis{}, err
+	}
 	params, _ := json.Marshal(p)
-	return s.run(ctx, "trend", nil, params, input, prompt)
+	return s.run(ctx, "trend", nil, params, input, input+"\n\n"+TrendRequest)
+}
+
+// ExternalResult はアプリの外（MCP 経由の Claude など）で書いた解析結果。
+type ExternalResult struct {
+	Kind    string      `json:"kind"`     // solve / trend
+	SolveID int64       `json:"solve_id"` // kind=solve のとき
+	Trend   TrendParams `json:"params"`   // kind=trend のとき
+	Result  string      `json:"result"`   // Markdown
+	Model   string      `json:"model"`    // 空なら ExternalModel
+}
+
+// ExternalModel は、外で書いた解析結果のモデル名が空のときに使う名前。
+const ExternalModel = "Claude（MCP）"
+
+// SaveExternal は外で書いた解析結果を保存する。入力データはここで作り直して一緒に保存する。
+func (s *Service) SaveExternal(ctx context.Context, r ExternalResult) (Analysis, error) {
+	if strings.TrimSpace(r.Result) == "" {
+		return Analysis{}, errors.New("result が空です")
+	}
+	model := strings.TrimSpace(r.Model)
+	if model == "" {
+		model = ExternalModel
+	}
+	switch r.Kind {
+	case "solve":
+		input, err := s.SolveInput(ctx, r.SolveID)
+		if err != nil {
+			return Analysis{}, err
+		}
+		return s.save(ctx, "solve", &r.SolveID, json.RawMessage(`{}`), input, Completion{Text: r.Result, Model: model})
+	case "trend":
+		input, p, err := s.TrendInput(ctx, r.Trend)
+		if err != nil {
+			return Analysis{}, err
+		}
+		params, _ := json.Marshal(p)
+		return s.save(ctx, "trend", nil, params, input, Completion{Text: r.Result, Model: model})
+	default:
+		return Analysis{}, fmt.Errorf("kind は solve か trend で指定してください（%q）", r.Kind)
+	}
 }
 
 func (s *Service) run(ctx context.Context, kind string, solveID *int64, params json.RawMessage, input, prompt string) (Analysis, error) {
@@ -114,6 +175,10 @@ func (s *Service) run(ctx context.Context, kind string, solveID *int64, params j
 	if err != nil {
 		return Analysis{}, err
 	}
+	return s.save(ctx, kind, solveID, params, input, c)
+}
+
+func (s *Service) save(ctx context.Context, kind string, solveID *int64, params json.RawMessage, input string, c Completion) (Analysis, error) {
 	res, err := s.db.ExecContext(ctx, `INSERT INTO analyses (kind, solve_id, params, input, result, model, input_tokens, output_tokens)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, kind, solveID, string(params), input, c.Text, c.Model, c.InputTokens, c.OutputTokens)
 	if err != nil {

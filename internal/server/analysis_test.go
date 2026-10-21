@@ -99,3 +99,50 @@ func TestAnalysisFlow(t *testing.T) {
 		t.Fatalf("delete analysis: %d", rec.Code)
 	}
 }
+
+// API キーが無くても、入力データの取得と、外で書いた解析結果の保存はできる（MCP 経由の Claude 用）
+func TestExternalAnalysis(t *testing.T) {
+	h := newAnalysisServer(t, nil)
+	do(t, h, http.MethodPost, "/api/solves", solveWithSplits)
+
+	rec := do(t, h, http.MethodGet, "/api/solves/1/analysis-input", "")
+	var in struct {
+		Input, System, Request string
+	}
+	json.Unmarshal(rec.Body.Bytes(), &in)
+	if rec.Code != http.StatusOK || !strings.Contains(in.Input, "| Cross |") || in.System != analysis.SystemPrompt || in.Request == "" {
+		t.Fatalf("solve input: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, h, http.MethodGet, "/api/solves/99/analysis-input", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("missing solve input: %d", rec.Code)
+	}
+	rec = do(t, h, http.MethodGet, "/api/analysis-input/trend?limit=10", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"params":{"mode":"full","limit":10}`) {
+		t.Fatalf("trend input: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, h, http.MethodGet, "/api/analysis-input/trend?mode=case", ""); rec.Code != http.StatusBadRequest {
+		t.Fatalf("trend input with no solves: %d", rec.Code)
+	}
+
+	rec = do(t, h, http.MethodPost, "/api/analyses", `{"kind":"solve","solve_id":1,"result":"## 結論\nクロスが長い"}`)
+	var a analysis.Analysis
+	json.Unmarshal(rec.Body.Bytes(), &a)
+	if rec.Code != http.StatusCreated || a.Kind != "solve" || *a.SolveID != 1 || a.Model != analysis.ExternalModel || !strings.Contains(a.Input, "| Cross |") {
+		t.Fatalf("save solve: %d %s", rec.Code, rec.Body)
+	}
+	rec = do(t, h, http.MethodPost, "/api/analyses", `{"kind":"trend","params":{"limit":5},"result":"ok","model":"Claude Opus"}`)
+	json.Unmarshal(rec.Body.Bytes(), &a)
+	if rec.Code != http.StatusCreated || a.Kind != "trend" || a.Model != "Claude Opus" || string(a.Params) != `{"mode":"full","limit":5}` {
+		t.Fatalf("save trend: %d %s", rec.Code, rec.Body)
+	}
+
+	for body, code := range map[string]int{
+		`{"kind":"solve","solve_id":1,"result":"  "}`: http.StatusBadRequest,
+		`{"kind":"other","result":"x"}`:               http.StatusBadRequest,
+		`{"kind":"solve","solve_id":99,"result":"x"}`: http.StatusNotFound,
+	} {
+		if rec := do(t, h, http.MethodPost, "/api/analyses", body); rec.Code != code {
+			t.Errorf("%s: %d %s", body, rec.Code, rec.Body)
+		}
+	}
+}

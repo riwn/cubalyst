@@ -59,6 +59,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/solves/{id}/analyses", s.handleListSolveAnalyses)
 	mux.HandleFunc("POST /api/analyses/trend", s.handleAnalyzeTrend)
 	mux.HandleFunc("GET /api/analyses", s.handleListAnalyses)
+	mux.HandleFunc("POST /api/analyses", s.handleSaveAnalysis)
+	mux.HandleFunc("GET /api/solves/{id}/analysis-input", s.handleSolveAnalysisInput)
+	mux.HandleFunc("GET /api/analysis-input/trend", s.handleTrendAnalysisInput)
 	mux.HandleFunc("DELETE /api/analyses/{id}", s.handleDeleteAnalysis)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})

@@ -64,6 +64,65 @@ func (s *Server) handleAnalyzeTrend(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, a)
 }
 
+// handleSolveAnalysisInput は単一ソルブの解析に渡す入力データを返す（MCP 経由で Claude が読む）。
+func (s *Server) handleSolveAnalysisInput(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	input, err := s.analysis.SolveInput(r.Context(), id)
+	if err != nil {
+		writeAnalysisError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, analysisInput{Input: input, System: analysis.SystemPrompt, Request: analysis.SolveRequest})
+}
+
+// handleTrendAnalysisInput は直近N件の傾向分析に渡す入力データを返す。
+func (s *Server) handleTrendAnalysisInput(w http.ResponseWriter, r *http.Request) {
+	p := analysis.TrendParams{Mode: r.URL.Query().Get("mode"), Limit: 50}
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, errors.New("limit must be an integer"))
+			return
+		}
+		p.Limit = n
+	}
+	input, p, err := s.analysis.TrendInput(r.Context(), p)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, analysisInput{Input: input, System: analysis.SystemPrompt, Request: analysis.TrendRequest, Params: &p})
+}
+
+type analysisInput struct {
+	Input   string                `json:"input"`
+	System  string                `json:"system"`
+	Request string                `json:"request"`
+	Params  *analysis.TrendParams `json:"params,omitempty"`
+}
+
+// handleSaveAnalysis はアプリの外で書いた解析結果を保存する。
+func (s *Server) handleSaveAnalysis(w http.ResponseWriter, r *http.Request) {
+	var in analysis.ExternalResult
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	a, err := s.analysis.SaveExternal(r.Context(), in)
+	if err != nil {
+		if errors.Is(err, solves.ErrNotFound) {
+			writeError(w, http.StatusNotFound, err)
+		} else {
+			writeError(w, http.StatusBadRequest, err)
+		}
+		return
+	}
+	writeJSON(w, http.StatusCreated, a)
+}
+
 func (s *Server) handleListAnalyses(w http.ResponseWriter, r *http.Request) {
 	limit := 20
 	if v := r.URL.Query().Get("limit"); v != "" {
