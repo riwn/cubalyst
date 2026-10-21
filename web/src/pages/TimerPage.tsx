@@ -1,9 +1,10 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { CubeView } from '../components/CubeView'
 import { MockControls } from '../components/MockControls'
 import { MoveLog } from '../components/MoveLog'
 import { RecentSolves } from '../components/RecentSolves'
 import { ScrambleDisplay } from '../components/ScrambleDisplay'
+import { StageRibbon } from '../components/StageRibbon'
 import { TimerDisplay } from '../components/TimerDisplay'
 import { useCubeState, useCubeStore } from '../cube/hooks'
 import { useSettings } from '../settings/hooks'
@@ -31,6 +32,11 @@ export function TimerPage() {
   const state = useSessionState(session)
   const { status } = useCubeState()
   const debug = useDebug()
+  const last = state?.last
+  const lastSplits = useMemo(
+    () => (last ? withSplits(store.kpuzzle, last, settings.cross_color).splits : undefined),
+    [store.kpuzzle, last, settings.cross_color],
+  )
 
   return (
     <div className="timer-page">
@@ -38,6 +44,7 @@ export function TimerPage() {
         <>
           <ScrambleDisplay session={session} state={state} />
           <TimerDisplay state={state} />
+          {state.phase !== 'running' && last && <StageRibbon key={last.solved_at} splits={lastSplits} />}
         </>
       )}
       {status === 'disconnected' && <p className="muted center">右上の「Connect」でキューブを接続すると計測できます</p>}
