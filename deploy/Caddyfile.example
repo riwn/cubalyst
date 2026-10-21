@@ -1,0 +1,31 @@
+# Cubalyst を LAN 内に HTTPS で公開する Caddy の設定例（docs/lan.md を参照）。
+# 192.168.1.10 をサーバーの LAN 側の IP アドレスに置き換えて /etc/caddy/Caddyfile に置く。
+# 8090 は deploy/install-service.sh で起動した Cubalyst の待ち受けポート。
+{
+	# 認証局のルート証明書を、このサーバー自身の信頼ストアには入れない（各端末に入れる）
+	skip_install_trust
+	# IP アドレスで開くとブラウザは SNI を送らないので、使う証明書を指定しておく
+	default_sni 192.168.1.10
+	# 80 番（HTTP→HTTPS のリダイレクト）は待ち受けない
+	auto_https disable_redirects
+}
+
+https://192.168.1.10 {
+	# LAN 側のアドレスだけで待ち受ける（ほかのインターフェースには出さない）
+	bind 192.168.1.10
+	# Caddy 自身の認証局で証明書を発行する。ルート証明書を各端末に信頼させる
+	tls internal
+
+	# 端末に入れるルート証明書を配る（公開してよい情報）。
+	# パスは apt で入れた Caddy（caddy ユーザーで動く）の場合
+	handle /caddy-root.crt {
+		root * /var/lib/caddy/.local/share/caddy/pki/authorities/local
+		rewrite * /root.crt
+		header Content-Type application/x-x509-ca-cert
+		file_server
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8090
+	}
+}
