@@ -59,20 +59,6 @@ export class ScrambleTracker {
     return this.progress
   }
 
-  /** 回転以外の理由で状態が変わった（実機との再同期など）。 */
-  onReplace(pattern: KPattern): ScrambleProgress {
-    if (!this.match(pattern)) {
-      // 道筋から外れた状態に置き換わった。どこからでも続けられるよう、ここを起点に組み直す。
-      this.moves = this.moves.slice(this.done)
-      this.states = [pattern]
-      for (const m of this.moves) this.states.push(this.states[this.states.length - 1].applyMove(m))
-      this.done = 0
-      this.halfPattern = null
-      this.deviation = []
-    }
-    return this.progress
-  }
-
   /** 期待状態のいずれかに一致すれば進捗を更新して true。 */
   private match(pattern: KPattern): boolean {
     const next = this.done + 1

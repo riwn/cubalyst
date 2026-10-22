@@ -3,7 +3,8 @@
 //   generating → scrambling → ready → running → [保存] → generating …
 //
 // - scrambling: スクランブルの進捗を追跡し、目標状態に一致したら ready
-//   （ステップ練習は完成状態からのスクランブルなので、揃っていなければ今の状態から同じ状態へ行く手順を作って回してもらう）
+//   スクランブルは完成状態からの手順（記録にはこれを残す）。揃っていなければ、それを完成状態から回したときと
+//   同じ状態へ今の状態から行く手順を作って回してもらう。だれがどの状態から始めても、記録のスクランブルと開始状態が一致する
 // - ready: 最初の回転で計測開始（running）
 // - running: 練習の完了条件（isGoal）を満たしたら停止して保存し、次の出題へ
 
@@ -18,18 +19,12 @@ import { ScrambleTracker, type ScrambleProgress } from './scramble-tracker'
 /** 1回分の出題。 */
 export type Exercise = {
   mode: SolveMode
-  /** スクランブル。scrambleFromSolved なら完成状態からの手順（記録にはこれを残す）。 */
+  /** スクランブル。完成状態からの手順（記録にはこれを残す）。 */
   scramble: string
   caseId?: string
   step?: string
   /** 画面に出す説明（例：「OLL 21」）。 */
   label?: string
-  /**
-   * スクランブルが完成状態からの手順か（ステップ練習は true。始める状態が決まっている）。
-   * キューブが揃っていなければ、今の状態からスクランブル後と同じ状態へ行く手順を作って回してもらう。
-   * false（フルソルブ）なら、今の状態からそのまま scramble を回す。
-   */
-  scrambleFromSolved: boolean
   /** 計測を止める条件。 */
   isGoal: (pattern: KPattern) => boolean
 }
@@ -190,7 +185,7 @@ export class SolveSession {
     if (!exercise) return
     const pattern = this.store.getSnapshot().pattern
     let scramble = exercise.scramble
-    if (exercise.scrambleFromSolved && !isSolved(pattern)) {
+    if (!isSolved(pattern)) {
       // 完成状態からのスクランブルで行き着く状態へ、今の状態から行く手順を作る
       const token = ++this.scrambleToken
       this.tracker = null
@@ -236,14 +231,10 @@ export class SolveSession {
   }
 
   private handleReplace(pattern: KPattern) {
-    const { phase, exercise } = this.state
+    const { phase } = this.state
     if (phase === 'scrambling' && this.tracker) {
-      if (exercise?.scrambleFromSolved) {
-        // 目標の状態が決まっているので、今の状態から手順を作り直す
-        void this.beginScramble()
-      } else {
-        this.updateScrambling(this.tracker.onReplace(pattern))
-      }
+      // 目標の状態は決まっているので、今の状態から手順を作り直す
+      void this.beginScramble()
     } else if (phase === 'running') {
       this.checkGoal(pattern)
     }

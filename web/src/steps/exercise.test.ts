@@ -88,7 +88,7 @@ describe('learnedExerciseSource', () => {
         const level = stageLevel(patternToFacelets(kpuzzle.defaultPattern().applyAlg(ex.scramble)), color)
         // F2L は FR の1ペアだけ崩れている（クロス＋3スロット）／OLL は F2L 完成／PLL は OLL 完成
         expect([c.set, level]).toEqual([c.set, { F2L: 4, OLL: 5, PLL: 6 }[c.set]])
-        expect(ex).toMatchObject({ mode: 'step', step: c.set.toLowerCase(), scrambleFromSolved: true })
+        expect(ex).toMatchObject({ mode: 'step', step: c.set.toLowerCase() })
       }
       expect(seen.size).toBeGreaterThan(3)
     }
