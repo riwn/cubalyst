@@ -1416,3 +1416,37 @@ button.danger-solid {
   color: var(--ok);
   font-weight: 600;
 }
+
+/* 補助付きフルソルブ：計測中にケースと手順を出す */
+.assist {
+  max-width: 720px;
+  margin: 12px auto 0;
+}
+
+.assist-stage {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.assist-case {
+  align-items: center;
+  gap: 8px 14px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+.assist-slot {
+  min-width: 2.5em;
+  font-weight: 700;
+}
+
+.assist-alg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.6em;
+  font-size: 1.5rem;
+}
+
+.assist-setup {
+  color: var(--mute);
+}

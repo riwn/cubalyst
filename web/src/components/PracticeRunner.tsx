@@ -3,26 +3,28 @@ import type { NewSolve, Solve } from '../api'
 import { useCubeState } from '../cube/hooks'
 import { useSaveSolve, useSessionState, useSolveSession } from '../solve/hooks'
 import { invert, splitAlg } from '../solve/notation'
-import type { ExerciseSource } from '../solve/session'
+import type { ExerciseSource, SessionState } from '../solve/session'
 import { CubeView } from './CubeView'
 import { MockControls } from './MockControls'
 import { ScrambleDisplay } from './ScrambleDisplay'
 import { TimerDisplay } from './TimerDisplay'
 
 /**
- * 練習の計測部分（接続・スクランブル・タイマー・3D）。ケース練習とステップ練習で共通。
- * prepare で保存前のソルブを加工できる（段階の付与など）。
+ * 練習の計測部分（接続・スクランブル・タイマー・3D）。ステップ練習と補助付きフルソルブで共通。
+ * prepare で保存前のソルブを加工できる（段階の付与など）。overlay はタイマーの下に出す（計測中の補助など）。
  */
 export function PracticeRunner({
   source,
   onSaved,
   prepare,
   side,
+  overlay,
 }: {
   source: ExerciseSource
   onSaved: (solve: Solve) => void
   prepare?: (solve: NewSolve) => NewSolve
   side?: ReactNode
+  overlay?: (state: SessionState) => ReactNode
 }) {
   const { save, error } = useSaveSolve(onSaved)
   const session = useSolveSession(source, (s) => save(prepare ? prepare(s) : s))
@@ -49,6 +51,7 @@ export function PracticeRunner({
         <>
           <ScrambleDisplay session={session} state={state} />
           <TimerDisplay state={state} />
+          {overlay?.(state)}
         </>
       )}
       {status === 'disconnected' && <p className="muted center">右上の「Connect」でキューブを接続すると練習できます</p>}

@@ -20,6 +20,8 @@ const (
 	ModeFull = "full"
 	ModeCase = "case"
 	ModeStep = "step"
+	// ModeAssist は補助付きフルソルブ（練習。ケースと手順を画面に出しながら解く）。タイマーの記録とは分ける。
+	ModeAssist = "assist"
 )
 
 // Penalty の値。空文字はペナルティなし。
@@ -76,7 +78,7 @@ type AnalysisCounts struct {
 // Validate は保存前の値を検証する。
 func (s *Solve) Validate() error {
 	switch s.Mode {
-	case ModeFull, ModeCase, ModeStep:
+	case ModeFull, ModeCase, ModeStep, ModeAssist:
 	default:
 		return fmt.Errorf("invalid mode %q", s.Mode)
 	}

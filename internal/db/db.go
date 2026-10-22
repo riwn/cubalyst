@@ -112,14 +112,43 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
+// noForeignKeys をファイルに書いたマイグレーションは、外部キーを止めて適用する。
+// 参照されているテーブルを作り直す（CHECK 制約の変更など）ときに使う。止めずに DROP TABLE すると、
+// 参照している行が ON DELETE CASCADE で消えてしまう。適用後に外部キーの整合を確かめる。
+const noForeignKeys = "-- cubalyst:foreign-keys-off"
+
 func apply(ctx context.Context, db *sql.DB, m migration) error {
-	tx, err := db.BeginTx(ctx, nil)
+	// PRAGMA foreign_keys はトランザクションの外で、同じ接続に対して切り替える必要がある
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if strings.Contains(m.sql, noForeignKeys) {
+		if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+			return err
+		}
+		defer conn.ExecContext(context.Background(), `PRAGMA foreign_keys = ON`)
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx, m.sql); err != nil {
 		return err
+	}
+	if strings.Contains(m.sql, noForeignKeys) {
+		rows, err := tx.QueryContext(ctx, `PRAGMA foreign_key_check`)
+		if err != nil {
+			return err
+		}
+		bad := rows.Next()
+		rows.Close()
+		if bad {
+			return fmt.Errorf("foreign key check failed")
+		}
 	}
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO schema_migrations (version, name) VALUES (?, ?)`, m.version, m.name); err != nil {

@@ -131,3 +131,66 @@ func TestMigrateAnalysisTargets(t *testing.T) {
 		t.Fatalf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+// 0008：solves を作り直しても、段階・解析の結び付き・トリガーが残り、assist を保存できる
+func TestMigrateAssistModeKeepsReferences(t *testing.T) {
+	ctx := context.Background()
+	database, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	if _, err := database.ExecContext(ctx, `CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL,
+		applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))`); err != nil {
+		t.Fatal(err)
+	}
+	ms, err := loadMigrations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range ms {
+		if m.version < 8 {
+			if err := apply(ctx, database, m); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	exec := func(q string, args ...any) {
+		t.Helper()
+		if _, err := database.ExecContext(ctx, q, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	count := func(q string) int {
+		t.Helper()
+		var n int
+		if err := database.QueryRowContext(ctx, q).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	exec(`INSERT INTO solves (id, mode, solved_at, total_ms, scramble) VALUES (1, 'full', '2026-10-20T10:00:00.000Z', 1000, 'R')`)
+	exec(`INSERT INTO solve_splits (solve_id, stage, start_ms, end_ms, move_count, start_index, end_index) VALUES (1, 'cross', 0, 500, 3, 0, 3)`)
+	exec(`INSERT INTO analyses (id, kind, input, result, model) VALUES (1, 'solve', 'in', 'r', 'm')`)
+	exec(`INSERT INTO analysis_solves (analysis_id, solve_id) VALUES (1, 1)`)
+
+	if err := Migrate(ctx, database); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(`SELECT COUNT(*) FROM solve_splits`) + count(`SELECT COUNT(*) FROM analysis_solves`); n != 2 {
+		t.Fatalf("references lost: %d", n)
+	}
+	var fk int
+	if err := database.QueryRowContext(ctx, `PRAGMA foreign_keys`).Scan(&fk); err != nil || fk != 1 {
+		t.Fatalf("foreign_keys after migration: %d %v", fk, err)
+	}
+	exec(`INSERT INTO solves (id, mode, solved_at, total_ms, scramble) VALUES (2, 'assist', '2026-10-20T11:00:00.000Z', 1000, 'R')`)
+	if _, err := database.ExecContext(ctx, `INSERT INTO solves (mode, solved_at, total_ms, scramble) VALUES ('other', 'x', 1, '')`); err == nil {
+		t.Fatal("unknown mode should be rejected")
+	}
+	// ソルブを消すと、段階と単体の解析も消える（外部キーとトリガーが効いている）
+	exec(`DELETE FROM solves WHERE id = 1`)
+	if n := count(`SELECT COUNT(*) FROM solve_splits`) + count(`SELECT COUNT(*) FROM analyses`); n != 0 {
+		t.Fatalf("cascade after migration: %d", n)
+	}
+}
