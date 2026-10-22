@@ -2,7 +2,7 @@
 
 **スマートキューブで解いた1回1回を、CFOP の段階ごとに記録・分析して、次の練習まで導くキューブタイマー。**
 
-Bluetooth でつないだスマートキューブの回転をそのまま記録するので、タイムだけでなく、Cross・F2L・OLL・PLL の各段階にかかった時間、手数、TPS、止まっていた時間までわかります。苦手なケースは手順練習やステップ練習で繰り返し、Claude にソルブを解析させてアドバイスをもらうこともできます。
+Bluetooth でつないだスマートキューブの回転をそのまま記録するので、タイムだけでなく、Cross・F2L・OLL・PLL の各段階にかかった時間、手数、TPS、止まっていた時間までわかります。苦手なケースは手順練習やステップ練習で繰り返し、AI にソルブを解析させてアドバイスをもらうこともできます。
 
 ![タイマー画面](docs/images/timer.jpg)
 
@@ -40,9 +40,9 @@ Bluetooth でつないだスマートキューブの回転をそのまま記録�
 
 ![ステップ練習](docs/images/step-practice.jpg)
 
-### Claude による解析
+### AI による解析
 
-Claude Code や Claude Desktop から MCP でつなぐと、Claude がソルブの記録を読んで、伸びしろの大きい点と次の練習を提案し、アプリに保存します。1回のソルブの「単体」の解析と、複数のソルブを「まとめ」た解析があります。API キーは要りません（Claude のプランの利用枠で動きます）。
+Cubalyst は記録を [MCP](https://modelcontextprotocol.io/) のツールとして公開します。MCP に対応した AI ツール（Claude Code、Claude Desktop、Codex CLI など）につなぐと、AI がソルブの記録を読んで、伸びしろの大きい点と次の練習を提案し、アプリに保存します。1回のソルブの「単体」の解析と、複数のソルブを「まとめ」た解析があります。解析の観点と出力の形式は、MCP の接続時にサーバーから AI へ渡しています。API キーは要らず、使っている AI ツールのプランの利用枠で動きます（動作を確かめているのは Claude Code と Claude Desktop です）。
 
 ![解析](docs/images/analyses.jpg)
 
@@ -80,7 +80,7 @@ Chrome で `chrome://flags/#enable-experimental-web-platform-features` を有効
 
 - **ふだんの計測**：「タイマー」で解き、「解析」の「履歴」でソルブを開いて段階ごとの時間を見る。キューブをつないでいないときは、Space（スマホはタイマーをタッチ）で操作するふつうのタイマーとして使えます（記録は保存しません）
 - **苦手の練習**：「解析」の「統計」で遅い段階を見つけ、「練習」の手順練習・ステップ練習でそこを繰り返す
-- **アドバイスをもらう**：Claude に「直近20件をまとめて見て」と頼み、「解析」の「AI解析」で結果を読む
+- **アドバイスをもらう**：MCP でつないだ AI に「直近20件をまとめて見て」と頼み、「解析」の「AI解析」で結果を読む
 
 ## ドキュメント
 
@@ -88,7 +88,7 @@ Chrome で `chrome://flags/#enable-experimental-web-platform-features` を有効
 |---|---|
 | 起動方法の詳細、モック接続、設定、API、ディレクトリ構成、テスト | [docs/development.md](docs/development.md) |
 | 常駐させて、同じ LAN のスマホやほかの PC から HTTPS で使う | [docs/lan.md](docs/lan.md) |
-| Claude Code / Claude Desktop から解析する（MCP とスキル） | [docs/mcp.md](docs/mcp.md) |
+| AI ツールから MCP でつないで解析する（設定例とスキル） | [docs/mcp.md](docs/mcp.md) |
 | 最初の仕様 | [cubalyst-spec.md](cubalyst-spec.md) |
 
 > **注意**：Cubalyst は自分の PC（または自宅のサーバー）で動かす、ひとり用のアプリです。サーバーは `127.0.0.1` でだけ待ち受け、認証はありません。
