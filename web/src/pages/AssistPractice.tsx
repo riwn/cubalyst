@@ -1,12 +1,13 @@
+import type { KPattern } from 'cubing/kpuzzle'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { listCases, type CaseInfo, type NewSolve, type Solve } from '../api'
-import { assistFor, viewFrom, type Assist } from '../assist/detect'
+import { stickyAssist, viewFrom, type Assist, type StickyAssist } from '../assist/detect'
 import { preferredAlg } from '../cases/algs'
 import type { CaseDef } from '../cases/data'
 import { CaseDiagram } from '../components/CaseDiagram'
 import { PracticeRunner } from '../components/PracticeRunner'
-import { useCubeState, useCubeStore } from '../cube/hooks'
+import { useCubeStore } from '../cube/hooks'
 import { holdRotation } from '../cube/orientation'
 import { useSettings } from '../settings/hooks'
 import { withSplits } from '../solve/cfop'
@@ -121,19 +122,35 @@ export function AssistPractice() {
   )
 }
 
-/** 計測中の補助。キューブの状態が変わるたびに判定し直す。 */
+/**
+ * 計測中の補助。キューブの状態が変わるたびに判定する。手順を回している途中で段階が一時的に下がっても、
+ * 回し終えて次の段階に進むまでは前の表示を保つ（ソルブごとに作り直されるので、保つのはそのソルブの中だけ）。
+ */
 function AssistPanel({ cases, delay }: { cases: Map<string, CaseInfo>; delay: number }) {
   const store = useCubeStore()
-  const { pattern } = useCubeState()
   const { settings } = useSettings()
   const rot = useMemo(
     () => holdRotation(store.kpuzzle.defaultPattern(), settings.hold_bottom, settings.hold_front),
     [store.kpuzzle, settings.hold_bottom, settings.hold_front],
   )
-  const assist = useMemo(
-    () => assistFor(store.kpuzzle, viewFrom(store.kpuzzle, pattern, rot), preferredAlg),
-    [store.kpuzzle, pattern, rot],
+  // 回転（と実機への再同期）ごとに判定する
+  const [sticky, setSticky] = useState<StickyAssist>(() =>
+    stickyAssist(null, store.kpuzzle, viewFrom(store.kpuzzle, store.getSnapshot().pattern, rot), preferredAlg),
   )
+  useEffect(() => {
+    const update = (pattern: KPattern) =>
+      setSticky((prev) => stickyAssist(prev, store.kpuzzle, viewFrom(store.kpuzzle, pattern, rot), preferredAlg))
+    const offMoves = store.moves.subscribe(({ pattern }) => update(pattern))
+    const offView = store.view.subscribe((u) => {
+      if (u.type === 'replace') update(u.pattern)
+    })
+    return () => {
+      offMoves()
+      offView()
+    }
+  }, [store, rot])
+  const assist = sticky.assist
+  const turning = sticky.frozen > 0
 
   // 同じケースのあいだは表示を続け、ケースが変わったら delay 秒待ってから手順を出す
   const key = assistKey(assist)
@@ -163,7 +180,9 @@ function AssistPanel({ cases, delay }: { cases: Map<string, CaseInfo>; delay: nu
     <section className="panel assist">
       {assist.stage === 'f2l' && (
         <>
-          <div className="assist-stage">F2L（残り {assist.slots.length} スロット）</div>
+          <div className="assist-stage">
+            F2L（残り {assist.slots.length} スロット）{turning && <TurningNote />}
+          </div>
           {assist.slots.map((s) => (
             <CaseHint
               key={s.slot}
@@ -179,13 +198,13 @@ function AssistPanel({ cases, delay }: { cases: Map<string, CaseInfo>; delay: nu
       )}
       {assist.stage === 'oll' && (
         <>
-          <div className="assist-stage">OLL</div>
+          <div className="assist-stage">OLL{turning && <TurningNote />}</div>
           <CaseHint c={assist.case} info={assist.case ? cases.get(assist.case.id) : undefined} steps={[assist.pre, assist.alg]} show={show} />
         </>
       )}
       {assist.stage === 'pll' && (
         <>
-          <div className="assist-stage">PLL</div>
+          <div className="assist-stage">PLL{turning && <TurningNote />}</div>
           <CaseHint
             c={assist.case}
             info={assist.case ? cases.get(assist.case.id) : undefined}
@@ -197,6 +216,11 @@ function AssistPanel({ cases, delay }: { cases: Map<string, CaseInfo>; delay: nu
       )}
     </section>
   )
+}
+
+/** 手順を回している途中（段階が一時的に下がっている）ことの印。 */
+function TurningNote() {
+  return <span className="muted small"> 手順の途中</span>
 }
 
 function assistKey(a: Assist): string {
