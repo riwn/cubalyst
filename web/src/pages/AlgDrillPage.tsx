@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createSolve, listCases, setCaseLearned, type CaseInfo } from '../api'
-import { algsFor } from '../cases/algs'
+import { algsFor, preferredAlg, savePreferredAlg } from '../cases/algs'
 import type { DrillAttempt } from '../cases/drill'
 import { useAlgDrill, useDrillState } from '../cases/hooks'
 import { scrambleBetween } from '../cases/exercise'
@@ -27,27 +27,6 @@ function loadTarget(id: string): number {
     return v > 0 ? v : 3
   } catch {
     return 3
-  }
-}
-
-const algKey = (id: string) => `cubalyst.drillAlg.${id}`
-
-/** 前回選んだ手順（選べる手順に無ければ標準手順）。 */
-function loadAlg(c: CaseInfo): string {
-  try {
-    const v = localStorage.getItem(algKey(c.id))
-    if (v && algsFor(c).includes(v)) return v
-  } catch {
-    // 読めなければ標準手順
-  }
-  return c.alg
-}
-
-function saveAlg(id: string, alg: string) {
-  try {
-    localStorage.setItem(algKey(id), alg)
-  } catch {
-    // 保存できなくても練習はできる
   }
 }
 
@@ -85,10 +64,10 @@ export function AlgDrillPage() {
       setError(`「覚えた」を保存できませんでした: ${String(err)}`)
     })
   }
-  const alg = selected ? (chosenAlg[selected.id] ?? loadAlg(selected)) : ''
+  const alg = selected ? (chosenAlg[selected.id] ?? preferredAlg(selected)) : ''
   const chooseAlg = (id: string, a: string) => {
     setChosenAlg((prev) => ({ ...prev, [id]: a }))
-    saveAlg(id, a)
+    savePreferredAlg(id, a)
   }
   if (error) return <p className="error">{error}</p>
 

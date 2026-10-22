@@ -21,7 +21,7 @@ import { convertMove } from '../cube/orientation'
 import { useHoldFrame, useSettings } from '../settings/hooks'
 import { computeSplits, COLOR_LABELS } from '../solve/cfop'
 import { effectiveTime, formatTime, type Penalty } from '../solve/stats'
-import { formatDate, MODE_LABELS } from '../format'
+import { formatDate, isFullSolve, MODE_LABELS } from '../format'
 
 /** ソルブ詳細：段階タイム、スクランブル、解法、ペナルティ・メモ編集。 */
 export function SolveDetailPage() {
@@ -99,7 +99,7 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
           <KebabMenu
             items={[
               { label: 'テキストで出力', onSelect: () => window.location.assign(exportUrl('txt', { ids: [solve.id] })) },
-              ...(solve.mode === 'full'
+              ...(isFullSolve(solve.mode)
                 ? [{ label: 'ステップを再計算', onSelect: () => void recompute() }]
                 : []),
               'separator',

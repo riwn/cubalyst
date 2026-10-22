@@ -1,26 +1,29 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
 import { AlgDrillPage } from './AlgDrillPage'
+import { AssistPractice } from './AssistPractice'
 import { StepPractice } from './StepPractice'
 
-type Mode = 'case' | 'step'
+type Mode = 'assist' | 'case' | 'step'
 
-/** 練習：モード選択（フル / ケース / ステップ）。 */
+const MODES: { mode: Mode; label: string }[] = [
+  { mode: 'assist', label: '補助付きフルソルブ' },
+  { mode: 'case', label: '手順練習' },
+  { mode: 'step', label: 'ステップ練習' },
+]
+
+/** 練習：モード選択（補助付きフルソルブ / 手順 / ステップ）。補助なしのフルソルブは上の「タイマー」。 */
 export function PracticePage() {
   const [mode, setMode] = useState<Mode>('case')
   return (
     <div className="practice-page">
       <div className="row mode-tabs">
-        <Link className="button" to="/">
-          フルソルブ（タイマー）
-        </Link>
-        <button className={mode === 'case' ? 'on-accent' : ''} onClick={() => setMode('case')}>
-          手順練習
-        </button>
-        <button className={mode === 'step' ? 'on-accent' : ''} onClick={() => setMode('step')}>
-          ステップ練習
-        </button>
+        {MODES.map((m) => (
+          <button key={m.mode} className={mode === m.mode ? 'on-accent' : ''} onClick={() => setMode(m.mode)}>
+            {m.label}
+          </button>
+        ))}
       </div>
+      {mode === 'assist' && <AssistPractice />}
       {mode === 'case' && <AlgDrillPage />}
       {mode === 'step' && <StepPractice />}
     </div>

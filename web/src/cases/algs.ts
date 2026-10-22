@@ -52,3 +52,25 @@ export const ALT_ALGS: Record<string, string[]> = {
 export function algsFor(c: { id: string; alg: string }): string[] {
   return [c.alg, ...(ALT_ALGS[c.id] ?? [])]
 }
+
+const algKey = (id: string) => `cubalyst.drillAlg.${id}`
+
+/** 手順練習で前回選んだ手順（選べる手順に無ければ標準手順）。 */
+export function preferredAlg(c: { id: string; alg: string }): string {
+  try {
+    const v = localStorage.getItem(algKey(c.id))
+    if (v && algsFor(c).includes(v)) return v
+  } catch {
+    // 読めなければ標準手順
+  }
+  return c.alg
+}
+
+/** 手順練習で選んだ手順を覚えておく。 */
+export function savePreferredAlg(id: string, alg: string) {
+  try {
+    localStorage.setItem(algKey(id), alg)
+  } catch {
+    // 保存できなくても練習はできる
+  }
+}

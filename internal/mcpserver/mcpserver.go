@@ -174,7 +174,7 @@ func localTime(t time.Time) string { return t.Local().Format("2006-01-02 15:04")
 type tools struct{ c *Client }
 
 type listSolvesArgs struct {
-	Mode   string `json:"mode,omitempty" jsonschema:"full（フルソルブ、既定）/ case（手順練習）/ step（ステップ練習）"`
+	Mode   string `json:"mode,omitempty" jsonschema:"full（フルソルブ、既定）/ case（手順練習）/ step（ステップ練習）/ assist（補助付きフルソルブ）"`
 	Limit  int    `json:"limit,omitempty" jsonschema:"件数（既定 20、最大 200）"`
 	Offset int    `json:"offset,omitempty" jsonschema:"先頭から飛ばす件数"`
 }

@@ -148,7 +148,7 @@ export function withSplits<T extends { mode: string; moves?: TimedMove[] }>(
   solve: T,
   color: CrossColor,
 ): T & { splits?: Split[] } {
-  if (solve.mode !== 'full' || !solve.moves?.length) return solve
+  if ((solve.mode !== 'full' && solve.mode !== 'assist') || !solve.moves?.length) return solve
   return { ...solve, splits: computeSplits(kpuzzle, solve.moves, color) }
 }
 

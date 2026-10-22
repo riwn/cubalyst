@@ -19,7 +19,8 @@ export async function fetchHealth(signal?: AbortSignal): Promise<Health> {
   return body
 }
 
-export type SolveMode = 'full' | 'case' | 'step'
+/** full：タイマー、case：手順練習、step：ステップ練習、assist：補助付きフルソルブ（練習。タイマーの記録とは分ける）。 */
+export type SolveMode = 'full' | 'case' | 'step' | 'assist'
 
 /** 保存する回転ログの1手。t は補正後の、ソルブ開始からの相対ms。 */
 export type SolveMove = {

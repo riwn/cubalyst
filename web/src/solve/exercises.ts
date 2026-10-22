@@ -13,3 +13,6 @@ export const fullSolveSource: ExerciseSource = async () => {
     isGoal: isSolved,
   }
 }
+
+/** 補助付きフルソルブ：フルソルブと同じ出題で、記録の種類だけ分ける。 */
+export const assistSolveSource: ExerciseSource = async () => ({ ...(await fullSolveSource()), mode: 'assist', label: '補助付きフルソルブ' })
