@@ -19,8 +19,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"cubalyst/internal/analysis"
-	"cubalyst/internal/solves"
+	"github.com/riwn/cubalyst/internal/analysis"
+	"github.com/riwn/cubalyst/internal/solves"
 )
 
 // Instructions は接続した AI に渡す前提。

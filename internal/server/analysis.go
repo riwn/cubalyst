@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"cubalyst/internal/analysis"
-	"cubalyst/internal/solves"
+	"github.com/riwn/cubalyst/internal/analysis"
+	"github.com/riwn/cubalyst/internal/solves"
 )
 
 // 解析は MCP でつないだ AI が行う。サーバーは入力データを渡し、書かれた結果を保存する。

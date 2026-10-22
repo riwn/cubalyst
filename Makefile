@@ -3,7 +3,7 @@
 # dev ターゲットで wait -n を使うため bash にする。
 SHELL := /bin/bash
 
-# 手元のGo（1.24）で固定する。自動ツールチェーンダウンロードを無効化。
+# go.mod の版（1.27）の手元のGoで固定する。自動ツールチェーンダウンロードを無効化。
 export GOTOOLCHAIN := local
 
 BIN := bin/cubalyst

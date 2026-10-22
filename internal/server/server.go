@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"cubalyst/internal/analysis"
-	"cubalyst/internal/db"
-	"cubalyst/internal/settings"
-	"cubalyst/internal/solves"
+	"github.com/riwn/cubalyst/internal/analysis"
+	"github.com/riwn/cubalyst/internal/db"
+	"github.com/riwn/cubalyst/internal/settings"
+	"github.com/riwn/cubalyst/internal/solves"
 )
 
 // Server はAPIとビルド済みフロントエンドを配信する。
@@ -65,7 +65,10 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 	})
 	mux.Handle("/", s.staticHandler())
-	return logRequests(mux)
+	// 認証が無いので、ほかのサイトを開いたブラウザから、書き込み系のAPIを勝手に呼ばれないようにする
+	// （Sec-Fetch-Site / Origin を見て、別オリジンからの GET・HEAD・OPTIONS 以外を 403 にする）。
+	// ブラウザ以外（MCPサーバーや curl）からの呼び出しは、これらのヘッダーが無いので通る
+	return logRequests(http.NewCrossOriginProtection().Handler(mux))
 }
 
 type healthResponse struct {

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"cubalyst/internal/settings"
-	"cubalyst/internal/solves"
+	"github.com/riwn/cubalyst/internal/settings"
+	"github.com/riwn/cubalyst/internal/solves"
 )
 
 // ErrNotFound は指定した解析結果が存在しないことを表す。

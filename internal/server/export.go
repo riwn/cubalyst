@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"cubalyst/internal/export"
-	"cubalyst/internal/settings"
-	"cubalyst/internal/solves"
+	"github.com/riwn/cubalyst/internal/export"
+	"github.com/riwn/cubalyst/internal/settings"
+	"github.com/riwn/cubalyst/internal/solves"
 )
 
 func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {

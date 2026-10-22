@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"cubalyst/internal/db"
+	"github.com/riwn/cubalyst/internal/db"
 )
 
 func newStore(t *testing.T) (*Store, *sql.DB) {

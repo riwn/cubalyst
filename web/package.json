@@ -24,7 +24,7 @@
     "recharts": "^3.10.1",
     "remark-gfm": "^4.0.1",
     "rxjs": "^7.8.2",
-    "smartcube-web-bluetooth": "github:poliva/smartcube-web-bluetooth#436e88a76abb"
+    "smartcube-web-bluetooth": "git+https://github.com/poliva/smartcube-web-bluetooth.git#436e88a76abbf656bb460a40dae3d9d5a6d5fd51"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

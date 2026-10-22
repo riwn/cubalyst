@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"cubalyst/internal/notation"
+	"github.com/riwn/cubalyst/internal/notation"
 )
 
 // Settings はアプリ設定。

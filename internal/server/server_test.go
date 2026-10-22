@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"cubalyst/internal/db"
+	"github.com/riwn/cubalyst/internal/db"
 )
 
 func newTestServer(t *testing.T, staticDir string) http.Handler {
@@ -53,6 +53,39 @@ func TestHealthDBDown(t *testing.T) {
 	New(database, t.TempDir()).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503", rec.Code)
+	}
+}
+
+func TestCrossOriginProtection(t *testing.T) {
+	h := newTestServer(t, t.TempDir())
+	cases := []struct {
+		name    string
+		method  string
+		headers map[string]string
+		blocked bool
+	}{
+		{"別サイトからの書き込み", http.MethodPost, map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}, true},
+		{"Sec-Fetch-Site の無い古いブラウザ", http.MethodPost, map[string]string{"Origin": "https://evil.example"}, true},
+		{"同じオリジンの画面から", http.MethodPost, map[string]string{"Sec-Fetch-Site": "same-origin", "Origin": "http://127.0.0.1:8080"}, false},
+		{"ブラウザ以外（MCP・curl）", http.MethodPost, nil, false},
+		{"別サイトからの読み取りは通る", http.MethodGet, map[string]string{"Sec-Fetch-Site": "cross-site"}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			path, body := "/api/solves", ""
+			if c.method == http.MethodPost {
+				path, body = "/api/analyses", `{"kind":"solve","solve_id":null,"result":"r"}`
+			}
+			req := httptest.NewRequest(c.method, "http://127.0.0.1:8080"+path, strings.NewReader(body))
+			for k, v := range c.headers {
+				req.Header.Set(k, v)
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if (rec.Code == http.StatusForbidden) != c.blocked {
+				t.Fatalf("status = %d, blocked = %v (body = %s)", rec.Code, c.blocked, rec.Body)
+			}
+		})
 	}
 }
 

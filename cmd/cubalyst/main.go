@@ -16,10 +16,10 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"cubalyst/internal/config"
-	"cubalyst/internal/db"
-	"cubalyst/internal/mcpserver"
-	"cubalyst/internal/server"
+	"github.com/riwn/cubalyst/internal/config"
+	"github.com/riwn/cubalyst/internal/db"
+	"github.com/riwn/cubalyst/internal/mcpserver"
+	"github.com/riwn/cubalyst/internal/server"
 )
 
 func main() {

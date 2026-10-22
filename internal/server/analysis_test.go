@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"cubalyst/internal/analysis"
-	"cubalyst/internal/solves"
+	"github.com/riwn/cubalyst/internal/analysis"
+	"github.com/riwn/cubalyst/internal/solves"
 )
 
 func decode[T any](t *testing.T, body []byte) T {
