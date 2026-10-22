@@ -1,4 +1,4 @@
-// ケースの状態とスクランブルの生成（ステップ練習・手順練習のモックで使う）。
+// ケースの状態とスクランブルの生成（ステップ練習・計測セッション・手順練習のモックで使う）。
 
 import { Alg } from 'cubing/alg'
 import type { KPattern, KPuzzle } from 'cubing/kpuzzle'
@@ -38,4 +38,14 @@ export async function scrambleFor(pattern: KPattern): Promise<string> {
   return splitAlg(solution.invert().toString())
     .map((m) => formatMove(parseMove(m)))
     .join(' ')
+}
+
+/**
+ * from の状態から to の状態へ行く手順を作る（どちらもキューブ座標系。センターは見ない）。
+ * from → to の変換 D を「完成状態から D を当てた状態」にしてソルバーに渡すと、
+ * 返ってくる手順は完成状態から D への手順＝ from から to への手順になる（状態は変換として合成されるため）。
+ */
+export async function scrambleBetween(kpuzzle: KPuzzle, from: KPattern, to: KPattern): Promise<string> {
+  const d = from.experimentalToTransformation()!.invert().applyTransformation(to.experimentalToTransformation()!)
+  return scrambleFor(kpuzzle.defaultPattern().applyTransformation(d))
 }

@@ -9,7 +9,7 @@ export const fullSolveSource: ExerciseSource = async () => {
   return {
     mode: 'full',
     scramble: alg.toString(),
-    requireSolvedStart: false,
+    scrambleFromSolved: false,
     isGoal: isSolved,
   }
 }

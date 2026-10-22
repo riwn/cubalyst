@@ -117,7 +117,7 @@ describe('SolveSession with mock cube', () => {
       async () => ({
         mode: 'full',
         scramble: scrambles.shift() ?? 'U',
-        requireSolvedStart: false,
+        scrambleFromSolved: false,
         isGoal: isSolved,
         ...exercise,
       }),
@@ -157,13 +157,42 @@ describe('SolveSession with mock cube', () => {
     expect(session.getSnapshot()).toMatchObject({ phase: 'scrambling', exercise: { scramble: 'F2' } })
   })
 
-  it('waits for a solved cube when required', async () => {
-    const { mock, session } = setup({ requireSolvedStart: true })
-    mock.turn('R')
+  it('uses the scramble as is when a from-solved exercise starts on a solved cube', async () => {
+    const { session } = setup({ scramble: "R U F'", scrambleFromSolved: true })
     await session.next()
-    expect(session.getSnapshot().phase).toBe('needSolved')
-    mock.turn("R'")
-    expect(session.getSnapshot().phase).toBe('scrambling')
+    expect(session.getSnapshot().progress!.moves).toEqual(['R', 'U', "F'"])
+  })
+
+  it('scrambles from an unsolved cube to the same state as the from-solved scramble', async () => {
+    const { store, mock, session, saved } = setup({ scramble: "R U F'", scrambleFromSolved: true })
+    mock.turn('L')
+    mock.turn('D2')
+    await session.next()
+    const { phase, progress } = session.getSnapshot()
+    expect(phase).toBe('scrambling')
+    for (const m of progress!.moves) mock.turn(m)
+    expect(session.getSnapshot().phase).toBe('ready')
+    const target = kpuzzle.defaultPattern().applyAlg("R U F'")
+    expect(store.getSnapshot().pattern.isIdentical(target)).toBe(true)
+
+    // 記録には完成状態からのスクランブルを残す
+    for (const m of ['F', "U'", "R'"]) mock.turn(m)
+    await flush()
+    expect(saved[0]).toMatchObject({ scramble: "R U F'" })
+  })
+
+  it('makes the scramble again from the new state if the cube is turned while generating', async () => {
+    const { store, mock, session } = setup({ scramble: "R U F'", scrambleFromSolved: true })
+    mock.turn('L')
+    const pending = session.next()
+    mock.turn('B')
+    await pending
+    await flush()
+    const { phase, progress } = session.getSnapshot()
+    expect(phase).toBe('scrambling')
+    for (const m of progress!.moves) mock.turn(m)
+    expect(session.getSnapshot().phase).toBe('ready')
+    expect(store.getSnapshot().pattern.isIdentical(kpuzzle.defaultPattern().applyAlg("R U F'"))).toBe(true)
   })
 
   it('records readyAt and applies no penalty for a quick start with inspection on', async () => {
