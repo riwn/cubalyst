@@ -7,7 +7,17 @@ description: Cubalyst（スマートキューブで記録したルービック�
 
 スマートキューブの実測データから、**数字を根拠に**、伸びしろの大きい点と次の練習を具体的に示す。
 
-データの出し入れは cubalyst の MCP ツールで行う。ツールが見つからないときは、cubalyst の MCP サーバーが登録されていない（または Cubalyst のサーバーが止まっている）と伝えて止まる。数値を推測で作らない。
+データの出し入れは cubalyst の MCP ツールで行う。ツールが使えないときは、下の「つながらないとき」に沿って原因と確かめ方を伝えて止まる。数値を推測で作らない。
+
+## つながらないとき
+
+構成：Cubalyst のサーバーは自宅のサーバー機で常駐していて、`cubalyst mcp`（MCP サーバー）はそのサーバー機の上で動く。Claude Code はサーバー機の上で直接、Claude Desktop は PC から SSH 越しに `cubalyst mcp` を起動してつなぐ（手順は docs/mcp.md）。PC でアプリを起動する必要はない。
+
+- **cubalyst のツールがこのチャットに無い**（list_solves などが見つからない）：MCP がこのチャットにつながっていない
+  - ブラウザの claude.ai や、スマホの Claude アプリからは使えない（MCP は Claude Desktop と Claude Code にだけ登録してある）。Claude Desktop のアプリのチャットか、サーバー機の Claude Code で使ってもらう
+  - Claude Desktop：「設定 → 開発者」に cubalyst があり「running」かを見てもらう。無ければ `claude_desktop_config.json`（同じ画面の「設定を編集」で開くファイル）に設定が保存されているかを見て、タスクトレイからも終了して起動し直してもらう。「failed」なら `%APPDATA%\Claude\logs\mcp-server-cubalyst.log` を見てもらう
+  - Claude Code：サーバー機で `claude mcp list` を実行し、cubalyst が `✔ Connected` かを見てもらう。デプロイより前に開いたセッションでは切れていることがあるので、新しいセッションで試してもらう
+- **ツールはあるが「接続できません」と返る**：Cubalyst のサーバーが止まっている。サーバー機で `deploy/release.sh --status`（または `systemctl --user status cubalyst`）を確かめてもらう
 
 ## 解析の種類
 
