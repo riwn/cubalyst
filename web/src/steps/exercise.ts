@@ -1,7 +1,7 @@
 // ステップ練習の出題。段階の「直前の状態」をランダムに作り、ソルバーの解の逆をスクランブルにする。
 
 import { KPattern, type KPuzzle } from 'cubing/kpuzzle'
-import { scrambleFor } from '../cases/exercise'
+import { caseStateInCubeFrame, scrambleFor } from '../cases/exercise'
 import { inFrame, normalizeOrientation } from '../cases/geometry'
 import { patternToFacelets } from '../cube/facelets'
 import { computeSplits, stageLevel, STAGES, type CrossColor, type Split } from '../solve/cfop'
@@ -109,6 +109,44 @@ export function stepExerciseSource(kpuzzle: KPuzzle, step: Step | undefined, col
       scramble,
       step: s,
       label: `${STEP_LABELS[s]}練習`,
+      scrambleFromSolved: true,
+      isGoal: stepGoal(s, color),
+    }
+  }
+}
+
+/** 覚えた手順だけの練習に使うケース（手順練習で「覚えた」と印を付けたもの）。 */
+export type LearnedCase = { id: string; set: 'OLL' | 'PLL' | 'F2L'; name: string; alg: string }
+
+/** ケースのセットに対応するステップ。 */
+export const SET_STEP: Record<LearnedCase['set'], Exclude<Step, 'cross'>> = { F2L: 'f2l', OLL: 'oll', PLL: 'pll' }
+
+const AUFS = ['', 'U', 'U2', "U'"]
+
+/**
+ * 覚えた手順だけのステップ練習。覚えたケースから1つ選び（step を指定したらそのステップのケースから）、
+ * 前後の AUF もランダムにした「そのケースの状態」から始める。F2L は FR スロットの1ペアだけが崩れた状態になる。
+ */
+export function learnedExerciseSource(
+  kpuzzle: KPuzzle,
+  step: Exclude<Step, 'cross'> | undefined,
+  color: CrossColor,
+  cases: LearnedCase[],
+  rand: () => number = Math.random,
+): ExerciseSource {
+  return async (): Promise<Exercise> => {
+    const pool = cases.filter((c) => !step || SET_STEP[c.set] === step)
+    if (pool.length === 0) throw new Error('覚えた手順がありません。手順練習で「覚えた」に印を付けてください')
+    const c = pool[Math.floor(rand() * pool.length)]
+    const s = SET_STEP[c.set]
+    const auf = () => AUFS[Math.floor(rand() * AUFS.length)]
+    const state = caseStateInCubeFrame(kpuzzle, c.alg, color, auf(), auf())
+    return {
+      mode: 'step',
+      scramble: await scrambleFor(state),
+      step: s,
+      caseId: c.id,
+      label: `${STEP_LABELS[s]}練習（覚えた手順）`,
       scrambleFromSolved: true,
       isGoal: stepGoal(s, color),
     }

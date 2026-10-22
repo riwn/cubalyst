@@ -80,3 +80,42 @@ func TestStaticSPAFallback(t *testing.T) {
 		}
 	}
 }
+
+func TestCaseLearned(t *testing.T) {
+	h := newTestServer(t, t.TempDir())
+	learned := func() map[string]bool {
+		var list []Case
+		if err := json.Unmarshal(do(t, h, http.MethodGet, "/api/cases?set=PLL", "").Body.Bytes(), &list); err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]bool{}
+		for _, c := range list {
+			if c.Learned {
+				out[c.ID] = true
+			}
+		}
+		return out
+	}
+	if l := learned(); len(l) != 0 {
+		t.Fatalf("initially learned: %v", l)
+	}
+	for range 2 { // 2回付けても1件
+		if rec := do(t, h, http.MethodPut, "/api/cases/pll-T/learned", `{"learned":true}`); rec.Code != http.StatusOK {
+			t.Fatalf("learn: %d %s", rec.Code, rec.Body)
+		}
+	}
+	do(t, h, http.MethodPut, "/api/cases/pll-Ja/learned", `{"learned":true}`)
+	if l := learned(); len(l) != 2 || !l["pll-T"] || !l["pll-Ja"] {
+		t.Fatalf("after learn: %v", l)
+	}
+	do(t, h, http.MethodPut, "/api/cases/pll-T/learned", `{"learned":false}`)
+	if l := learned(); len(l) != 1 || !l["pll-Ja"] {
+		t.Fatalf("after unlearn: %v", l)
+	}
+	if rec := do(t, h, http.MethodPut, "/api/cases/nope/learned", `{"learned":true}`); rec.Code != http.StatusNotFound {
+		t.Fatalf("missing case: %d", rec.Code)
+	}
+	if rec := do(t, h, http.MethodPut, "/api/cases/pll-T/learned", `{}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("missing learned: %d", rec.Code)
+	}
+}

@@ -2,7 +2,8 @@ import { cube3x3x3 } from 'cubing/puzzles'
 import { describe, expect, it } from 'vitest'
 import { patternToFacelets } from '../cube/facelets'
 import { stageLevel } from '../solve/cfop'
-import { randomStandardState, stepExerciseSource, stepGoal, stepSplits, toCubeFrame } from './exercise'
+import { ALL_CASES } from '../cases/data'
+import { learnedExerciseSource, randomStandardState, stepExerciseSource, stepGoal, stepSplits, toCubeFrame } from './exercise'
 
 const kpuzzle = await cube3x3x3.kpuzzle()
 
@@ -70,5 +71,35 @@ describe('stepSplits', () => {
     expect(stages).toContain('f2l4')
     expect(stages).not.toContain('oll')
     expect(stages).not.toContain('pll')
+  })
+})
+
+describe('learnedExerciseSource', () => {
+  const learned = ['oll-21', 'oll-45', 'pll-T', 'pll-Ja', 'f2l-2', 'f2l-30'].map((id) => ALL_CASES.find((c) => c.id === id)!)
+
+  it('starts from a learned case state just before its step', async () => {
+    for (const color of ['white', 'yellow'] as const) {
+      const source = learnedExerciseSource(kpuzzle, undefined, color, learned, rand)
+      const seen = new Set<string>()
+      for (let i = 0; i < 30; i++) {
+        const ex = await source()
+        seen.add(ex.caseId!)
+        const c = learned.find((x) => x.id === ex.caseId)!
+        const level = stageLevel(patternToFacelets(kpuzzle.defaultPattern().applyAlg(ex.scramble)), color)
+        // F2L は FR の1ペアだけ崩れている（クロス＋3スロット）／OLL は F2L 完成／PLL は OLL 完成
+        expect([c.set, level]).toEqual([c.set, { F2L: 4, OLL: 5, PLL: 6 }[c.set]])
+        expect(ex).toMatchObject({ mode: 'step', step: c.set.toLowerCase(), scrambleFromSolved: true })
+      }
+      expect(seen.size).toBeGreaterThan(3)
+    }
+  })
+
+  it('picks only cases of the chosen step', async () => {
+    const source = learnedExerciseSource(kpuzzle, 'pll', 'white', learned, rand)
+    for (let i = 0; i < 10; i++) expect((await source()).caseId).toMatch(/^pll-/)
+  })
+
+  it('fails when nothing is learned for the step', async () => {
+    await expect(learnedExerciseSource(kpuzzle, 'oll', 'white', [learned[2]], rand)()).rejects.toThrow('覚えた手順がありません')
   })
 })
