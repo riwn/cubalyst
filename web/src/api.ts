@@ -48,6 +48,9 @@ export type Solve = {
 
 export type NewSolve = Omit<Solve, 'id'>
 
+/** 一覧の並べ替えの基準。time は +2 込み、DNF と値の無いソルブ（段階が無いなど）はいつも最後。 */
+export type SolveSort = 'date' | 'time' | 'moves' | 'cross' | 'f2l' | 'oll' | 'pll'
+
 export type SolveFilter = {
   mode?: SolveMode
   from?: string
@@ -61,6 +64,7 @@ export type SolveFilter = {
   includeSplits?: boolean
   includeAnalyses?: boolean
   order?: 'asc' | 'desc'
+  sort?: SolveSort
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -90,6 +94,7 @@ export function filterToQuery(f: SolveFilter): string {
   const include = [f.includeMoves && 'moves', f.includeSplits && 'splits', f.includeAnalyses && 'analyses'].filter(Boolean)
   if (include.length) q.set('include', include.join(','))
   if (f.order) q.set('order', f.order)
+  if (f.sort) q.set('sort', f.sort)
   return q.toString()
 }
 

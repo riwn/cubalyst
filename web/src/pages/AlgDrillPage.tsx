@@ -97,7 +97,7 @@ export function AlgDrillPage() {
       {selected && (
         <section className="panel drill-selected" aria-live="polite">
           <div className="row">
-            <CaseDiagram c={selected} size={96} />
+            <CaseDiagram c={selected} size={96} arrows />
             <div className="drill-selected-info">
               <div className="row">
                 <strong>{selected.name}</strong>
@@ -277,7 +277,7 @@ function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBa
           </div>
 
           <section className="panel drill-head">
-            <CaseDiagram c={c} size={88} />
+            <CaseDiagram c={c} size={88} arrows />
             <div>
               <strong>{c.name}</strong>
               <div className="alg drill-alg">{alg}</div>

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -146,5 +147,57 @@ func TestListFilters(t *testing.T) {
 	list, _, _ = st.List(ctx, Filter{IDs: []int64{1, 3}})
 	if len(list) != 2 {
 		t.Fatalf("ids filter: %+v", list)
+	}
+}
+
+func TestListSort(t *testing.T) {
+	ctx := context.Background()
+	st, _ := newStore(t)
+	base := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	// id 1: 10.0s / id 2: 9.0s +2（11.0s） / id 3: 8.0s DNF / id 4: 12.0s
+	for i, v := range []struct {
+		ms      int64
+		penalty string
+	}{{10000, ""}, {9000, PenaltyPlus2}, {8000, PenaltyDNF}, {12000, ""}} {
+		s := sample(base.AddDate(0, 0, i), v.ms)
+		s.Penalty = v.penalty
+		if err := st.Create(ctx, s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// 段階は id 1・2 だけ（id 1 は手数が多く OLL が短い）
+	if err := st.ReplaceSplits(ctx, 1, []Split{{Stage: "cross", EndMS: 2000, MoveCount: 8}, {Stage: "oll", StartMS: 2000, EndMS: 3000, MoveCount: 30}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ReplaceSplits(ctx, 2, []Split{{Stage: "cross", EndMS: 3000, MoveCount: 6}, {Stage: "oll", StartMS: 3000, EndMS: 5000, MoveCount: 10}}); err != nil {
+		t.Fatal(err)
+	}
+
+	ids := func(f Filter) []int64 {
+		t.Helper()
+		list, _, err := st.List(ctx, f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := make([]int64, len(list))
+		for i, s := range list {
+			out[i] = s.ID
+		}
+		return out
+	}
+	for _, tc := range []struct {
+		f    Filter
+		want []int64
+	}{
+		{Filter{}, []int64{4, 3, 2, 1}},
+		{Filter{Sort: "time", Ascending: true}, []int64{1, 2, 4, 3}},  // +2 込みで比べ、DNF は最後
+		{Filter{Sort: "time"}, []int64{4, 2, 1, 3}},                   // 降順でも DNF は最後
+		{Filter{Sort: "moves", Ascending: true}, []int64{2, 1, 4, 3}}, // 段階の無いソルブは最後（新しい順）
+		{Filter{Sort: "oll", Ascending: true}, []int64{1, 2, 4, 3}},
+		{Filter{Sort: "time", Ascending: true, Limit: 2, Offset: 1}, []int64{2, 4}},
+	} {
+		if got := ids(tc.f); !slices.Equal(got, tc.want) {
+			t.Errorf("%+v: got %v, want %v", tc.f, got, tc.want)
+		}
 	}
 }

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link } from 'react-router'
-import { exportUrl, type ExportFormat, type Solve, type SolveFilter, type SolveMode } from '../api'
+import { exportUrl, type ExportFormat, type Solve, type SolveFilter, type SolveMode, type SolveSort } from '../api'
 import { AnalysisTabs } from '../components/AnalysisTabs'
 import { formatDate, KIND_LABELS, MODE_LABELS } from '../format'
 import { GROUP_LABELS, groupSplits, type StageGroup } from '../solve/cfop'
@@ -17,12 +17,16 @@ function nextDay(date: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** 履歴：ソルブ一覧（フィルタ・ページング・選択してexport）。 */
+type Sort = { key: SolveSort; asc: boolean }
+const DEFAULT_SORT: Sort = { key: 'date', asc: false }
+
+/** 履歴：ソルブ一覧（フィルタ・並べ替え・ページング・選択してexport）。 */
 export function HistoryPage() {
   const [mode, setMode] = useState<SolveMode | ''>('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [page, setPage] = useState(0)
+  const [sort, setSort] = useState<Sort>(DEFAULT_SORT)
   const [selected, setSelected] = useState<Set<number>>(new Set())
 
   const filter: SolveFilter = {
@@ -30,7 +34,15 @@ export function HistoryPage() {
     from: from || undefined,
     to: to ? nextDay(to) : undefined,
   }
-  const { solves, total, error } = useSolveList({ ...filter, limit: PAGE_SIZE, offset: page * PAGE_SIZE, includeSplits: true, includeAnalyses: true })
+  const { solves, total, error } = useSolveList({
+    ...filter,
+    sort: sort.key,
+    order: sort.asc ? 'asc' : 'desc',
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
+    includeSplits: true,
+    includeAnalyses: true,
+  })
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const toggle = (id: number) => {
@@ -47,6 +59,19 @@ export function HistoryPage() {
     set(v)
     setPage(0)
   }
+  // 同じ列ならもう一度押すと逆順。別の列は、日時なら新しい順、それ以外は速い（少ない）順から
+  const sortBy = (key: SolveSort) =>
+    resetPage(setSort)(sort.key === key ? { key, asc: !sort.asc } : { key, asc: key !== 'date' })
+  const sortHeader = (key: SolveSort, label: string) => (
+    <th aria-sort={sort.key === key ? (sort.asc ? 'ascending' : 'descending') : undefined}>
+      <button className={`sort-button ${sort.key === key ? 'sorted' : ''}`} onClick={() => sortBy(key)}>
+        {label}
+        <span className="sort-mark" aria-hidden="true">
+          {sort.key === key ? (sort.asc ? '▲' : '▼') : '↕'}
+        </span>
+      </button>
+    </th>
+  )
 
   return (
     <div className="history-page">
@@ -87,13 +112,13 @@ export function HistoryPage() {
           <tr>
             <th />
             <th>#</th>
-            <th>日時</th>
+            {sortHeader('date', '日時')}
             <th>モード</th>
-            <th>タイム</th>
+            {sortHeader('time', 'タイム')}
             {GROUPS.map((g) => (
-              <th key={g}>{GROUP_LABELS[g]}</th>
+              <Fragment key={g}>{sortHeader(g, GROUP_LABELS[g])}</Fragment>
             ))}
-            <th>手数</th>
+            {sortHeader('moves', '手数')}
             <th>解析</th>
             <th className="left">メモ</th>
           </tr>
