@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { CubeView } from '../components/CubeView'
+import { ManualTimer } from '../components/ManualTimer'
 import { MockControls } from '../components/MockControls'
 import { MoveLog } from '../components/MoveLog'
 import { RecentSolves } from '../components/RecentSolves'
@@ -17,7 +18,7 @@ import type { SessionState } from '../solve/session'
 
 const RECENT = { mode: 'full', limit: 12 } as const
 
-/** タイマー画面：フルソルブの計測。 */
+/** タイマー画面：フルソルブの計測。キューブ未接続のときは Space で操作する手動タイマー（保存しない）。 */
 export function TimerPage() {
   const recent = useSolveList(RECENT)
   const { reload } = recent
@@ -40,14 +41,23 @@ export function TimerPage() {
 
   return (
     <div className="timer-page">
-      {session && state && (
+      {session && state && status === 'disconnected' && (
+        <ManualTimer
+          scramble={state.exercise?.scramble}
+          inspection={settings.inspection}
+          onNext={() => void session.next()}
+        />
+      )}
+      {session && state && status !== 'disconnected' && (
         <>
           <ScrambleDisplay session={session} state={state} />
           <TimerDisplay state={state} />
           {state.phase !== 'running' && last && <StageRibbon key={last.solved_at} splits={lastSplits} />}
         </>
       )}
-      {status === 'disconnected' && <p className="muted center">右上の「Connect」でキューブを接続すると計測できます</p>}
+      {status === 'disconnected' && (
+        <p className="muted center">右上の「Connect」でキューブを接続すると、回転を記録して保存できます</p>
+      )}
       {saveError && <p className="error">{saveError}</p>}
       <div className="timer-grid">
         <div>
