@@ -109,7 +109,7 @@ export function stepExerciseSource(kpuzzle: KPuzzle, step: Step | undefined, col
       scramble,
       step: s,
       label: `${STEP_LABELS[s]}練習`,
-      requireSolvedStart: true,
+      scrambleFromSolved: true,
       isGoal: stepGoal(s, color),
     }
   }

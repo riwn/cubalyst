@@ -9,8 +9,7 @@ export function ScrambleDisplay({ session, state }: { session: SolveSession; sta
     <section className="scramble">
       {exercise?.label && <div className="exercise-label">{exercise.label}</div>}
       {phase === 'generating' && <p className="muted">スクランブルを生成中…</p>}
-      {phase === 'needSolved' && <p className="warn">キューブを完成状態にしてください（揃うと自動でスクランブルが始まります）</p>}
-      {progress && phase !== 'needSolved' && (
+      {progress && (
         <p className="scramble-moves">
           {progress.moves.map((m, i) => {
             const cls =
@@ -57,7 +56,7 @@ export function ScrambleDisplay({ session, state }: { session: SolveSession; sta
             </svg>
           </button>
         )}
-        {(phase === 'scrambling' || phase === 'needSolved') && (
+        {phase === 'scrambling' && (
           <KebabMenu
             align="left"
             items={[

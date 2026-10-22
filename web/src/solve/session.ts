@@ -1,8 +1,9 @@
 // 計測セッション（タイマーの状態機械）。
 //
-//   generating → (needSolved →) scrambling → ready → running → [保存] → generating …
+//   generating → scrambling → ready → running → [保存] → generating …
 //
 // - scrambling: スクランブルの進捗を追跡し、目標状態に一致したら ready
+//   （ステップ練習は完成状態からのスクランブルなので、揃っていなければ今の状態から同じ状態へ行く手順を作って回してもらう）
 // - ready: 最初の回転で計測開始（running）
 // - running: 練習の完了条件（isGoal）を満たしたら停止して保存し、次の出題へ
 
@@ -11,25 +12,31 @@ import type { NewSolve, SolveMode } from '../api'
 import type { Penalty } from './stats'
 import type { LoggedMove, CubeStore } from '../cube/store'
 import { fitTimestamps } from '../cube/timestamps'
+import { scrambleBetween } from '../cases/exercise'
 import { ScrambleTracker, type ScrambleProgress } from './scramble-tracker'
 
 /** 1回分の出題。 */
 export type Exercise = {
   mode: SolveMode
+  /** スクランブル。scrambleFromSolved なら完成状態からの手順（記録にはこれを残す）。 */
   scramble: string
   caseId?: string
   step?: string
   /** 画面に出す説明（例：「OLL 21」）。 */
   label?: string
-  /** スクランブル前に完成状態である必要があるか（ケース・ステップ練習は true）。 */
-  requireSolvedStart: boolean
+  /**
+   * スクランブルが完成状態からの手順か（ステップ練習は true。始める状態が決まっている）。
+   * キューブが揃っていなければ、今の状態からスクランブル後と同じ状態へ行く手順を作って回してもらう。
+   * false（フルソルブ）なら、今の状態からそのまま scramble を回す。
+   */
+  scrambleFromSolved: boolean
   /** 計測を止める条件。 */
   isGoal: (pattern: KPattern) => boolean
 }
 
 export type ExerciseSource = () => Promise<Exercise>
 
-export type SessionPhase = 'generating' | 'needSolved' | 'scrambling' | 'ready' | 'running'
+export type SessionPhase = 'generating' | 'scrambling' | 'ready' | 'running'
 
 /** WCAのインスペクション：15秒を超えたら+2、17秒を超えたらDNF。 */
 export const INSPECTION_MS = 15_000
@@ -83,6 +90,8 @@ export class SolveSession {
   private solveMoves: LoggedMove[] = []
   private unsubscribes: (() => void)[] = []
   private generation = 0
+  /** 今の状態からの手順の生成を、新しいものだけ有効にするための番号。 */
+  private scrambleToken = 0
   private disposed = false
 
   private readonly store: CubeStore
@@ -129,6 +138,7 @@ export class SolveSession {
   /** 次の出題を生成する。 */
   async next() {
     const gen = ++this.generation
+    this.scrambleToken++
     this.tracker = null
     this.solveMoves = []
     this.set({
@@ -150,12 +160,12 @@ export class SolveSession {
     }
     if (this.disposed || gen !== this.generation) return
     this.set({ exercise })
-    this.beginScramble()
+    await this.beginScramble()
   }
 
   /** スクランブル追跡を飛ばして計測待ちにする（追跡がうまくいかないとき用）。 */
   forceReady() {
-    if (this.state.phase === 'scrambling' || this.state.phase === 'needSolved') {
+    if (this.state.phase === 'scrambling') {
       this.setReady()
     }
   }
@@ -174,24 +184,34 @@ export class SolveSession {
     void this.next()
   }
 
-  private beginScramble() {
+  /** 今のキューブの状態からスクランブルの追跡を始める。 */
+  private async beginScramble(): Promise<void> {
     const exercise = this.state.exercise
     if (!exercise) return
     const pattern = this.store.getSnapshot().pattern
-    if (exercise.requireSolvedStart && !isSolved(pattern)) {
+    let scramble = exercise.scramble
+    if (exercise.scrambleFromSolved && !isSolved(pattern)) {
+      // 完成状態からのスクランブルで行き着く状態へ、今の状態から行く手順を作る
+      const token = ++this.scrambleToken
       this.tracker = null
-      this.set({ phase: 'needSolved', progress: null })
-      return
+      this.set({ phase: 'generating', progress: null })
+      const target = this.store.kpuzzle.defaultPattern().applyAlg(exercise.scramble)
+      try {
+        scramble = await scrambleBetween(this.store.kpuzzle, pattern, target)
+      } catch (err) {
+        if (token === this.scrambleToken) this.set({ error: `スクランブルの生成に失敗しました: ${String(err)}` })
+        return
+      }
+      if (this.disposed || token !== this.scrambleToken) return
+      // 生成中に回されたら、その状態から作り直す
+      if (!this.store.getSnapshot().pattern.isIdentical(pattern)) return this.beginScramble()
     }
-    this.tracker = new ScrambleTracker(exercise.scramble, pattern)
+    this.tracker = new ScrambleTracker(scramble, pattern)
     this.updateScrambling(this.tracker.progress)
   }
 
   private handleMove(move: LoggedMove, pattern: KPattern) {
     switch (this.state.phase) {
-      case 'needSolved':
-        if (isSolved(pattern)) this.beginScramble()
-        break
       case 'scrambling':
         this.updateScrambling(this.tracker!.onMove(move.move, pattern))
         break
@@ -217,12 +237,10 @@ export class SolveSession {
 
   private handleReplace(pattern: KPattern) {
     const { phase, exercise } = this.state
-    if (phase === 'needSolved') {
-      if (isSolved(pattern)) this.beginScramble()
-    } else if (phase === 'scrambling' && this.tracker) {
-      if (exercise?.requireSolvedStart) {
-        // ケース・ステップ練習では目標状態が変わってしまうので出題し直す
-        this.beginScramble()
+    if (phase === 'scrambling' && this.tracker) {
+      if (exercise?.scrambleFromSolved) {
+        // 目標の状態が決まっているので、今の状態から手順を作り直す
+        void this.beginScramble()
       } else {
         this.updateScrambling(this.tracker.onReplace(pattern))
       }

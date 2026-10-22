@@ -3,7 +3,7 @@ import { createSolve, listCases, type CaseInfo } from '../api'
 import { algsFor } from '../cases/algs'
 import type { DrillAttempt } from '../cases/drill'
 import { useAlgDrill, useDrillState } from '../cases/hooks'
-import { scrambleFor } from '../cases/exercise'
+import { scrambleBetween } from '../cases/exercise'
 import { invertRotation, normalizeOrientation } from '../cases/geometry'
 import { caseStats } from '../cases/stats'
 import { CaseDiagram } from '../components/CaseDiagram'
@@ -354,10 +354,7 @@ function MockDrillButton({ mock, alg, rotation }: { mock: MockConnection; alg: s
     setBusy(true)
     const start = store.getSnapshot().pattern
     const target = normalizeOrientation(store.kpuzzle, start.applyAlg(`${rotation} ${alg} ${invertRotation(rotation)}`))
-    // start → target の変換 D を「完成状態から D を当てた状態」にしてソルバーに渡すと、
-    // 返ってくる手順 S は完成状態から D への手順＝ start から target への手順になる（状態は変換として合成されるため）
-    const d = start.experimentalToTransformation()!.invert().applyTransformation(target.experimentalToTransformation()!)
-    const moves = await scrambleFor(store.kpuzzle.defaultPattern().applyTransformation(d))
+    const moves = await scrambleBetween(store.kpuzzle, start, target)
     mock.replay(parseMoveLog(moves), 2, () => setBusy(false))
   }
   return (
