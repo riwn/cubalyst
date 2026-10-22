@@ -200,7 +200,7 @@ body {
   }
 }
 
-/* 中のタブ（解析の統計・履歴・Claude の解析）。ボタンと同じ見た目のリンク */
+/* 中のタブ（解析の統計・履歴・AI解析）。ボタンと同じ見た目のリンク */
 a.button-link {
   padding: 5px 14px;
   border: 1px solid var(--line);
