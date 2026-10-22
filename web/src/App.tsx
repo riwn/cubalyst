@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useCallback, useRef, type ReactNode } from 'react'
 import { NavLink, Route, Routes } from 'react-router'
 import { SystemMenu } from './HealthStatus'
 import { CubeConnectionControl, CubeNotices } from './components/ConnectionPanel'
@@ -30,12 +30,30 @@ function Placeholder({ title }: { title: string }) {
   )
 }
 
+/**
+ * ヘッダーの高さを CSS 変数 --header-h に入れる（固定ヘッダーの下に貼り付く要素の位置に使う）。
+ * 設定の読み込みが終わるまでヘッダーは描かれないので、要素が付いたときに監視を始める。
+ */
+function useHeaderHeight() {
+  const observer = useRef<ResizeObserver | null>(null)
+  return useCallback((el: HTMLElement | null) => {
+    observer.current?.disconnect()
+    observer.current = null
+    if (!el) return
+    const update = () => document.documentElement.style.setProperty('--header-h', `${el.offsetHeight}px`)
+    update()
+    observer.current = new ResizeObserver(update)
+    observer.current.observe(el)
+  }, [])
+}
+
 export default function App() {
+  const headerRef = useHeaderHeight()
   return (
     <SettingsProvider>
       <CubeStoreProvider>
         <div className="app">
-          <header className="app-header">
+          <header className="app-header" ref={headerRef}>
             <h1>Cubalyst</h1>
             <nav>
               {pages.map((p) => (
