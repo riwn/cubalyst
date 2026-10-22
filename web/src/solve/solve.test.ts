@@ -117,7 +117,6 @@ describe('SolveSession with mock cube', () => {
       async () => ({
         mode: 'full',
         scramble: scrambles.shift() ?? 'U',
-        scrambleFromSolved: false,
         isGoal: isSolved,
         ...exercise,
       }),
@@ -157,14 +156,14 @@ describe('SolveSession with mock cube', () => {
     expect(session.getSnapshot()).toMatchObject({ phase: 'scrambling', exercise: { scramble: 'F2' } })
   })
 
-  it('uses the scramble as is when a from-solved exercise starts on a solved cube', async () => {
-    const { session } = setup({ scramble: "R U F'", scrambleFromSolved: true })
+  it('uses the scramble as is when the cube is solved', async () => {
+    const { session } = setup({ scramble: "R U F'" })
     await session.next()
     expect(session.getSnapshot().progress!.moves).toEqual(['R', 'U', "F'"])
   })
 
-  it('scrambles from an unsolved cube to the same state as the from-solved scramble', async () => {
-    const { store, mock, session, saved } = setup({ scramble: "R U F'", scrambleFromSolved: true })
+  it('scrambles from an unsolved cube to the same state as the scramble from solved', async () => {
+    const { store, mock, session, saved } = setup({ scramble: "R U F'" })
     mock.turn('L')
     mock.turn('D2')
     await session.next()
@@ -182,7 +181,7 @@ describe('SolveSession with mock cube', () => {
   })
 
   it('makes the scramble again from the new state if the cube is turned while generating', async () => {
-    const { store, mock, session } = setup({ scramble: "R U F'", scrambleFromSolved: true })
+    const { store, mock, session } = setup({ scramble: "R U F'" })
     mock.turn('L')
     const pending = session.next()
     mock.turn('B')
