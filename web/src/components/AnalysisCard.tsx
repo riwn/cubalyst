@@ -3,7 +3,7 @@ import Markdown from 'react-markdown'
 import { Link } from 'react-router'
 import remarkGfm from 'remark-gfm'
 import { deleteAnalysis, type Analysis, type AnalysisKind } from '../api'
-import { formatDate, KIND_LABELS } from '../format'
+import { formatDate, KIND_LABELS, multiTitle } from '../format'
 import { ConfirmDialog } from '../ui/Dialog'
 import { KebabMenu } from '../ui/Popover'
 
@@ -19,7 +19,7 @@ export function AnalysisTarget({ a }: { a: Analysis }) {
   }
   return (
     <Link to={`/analyses/${a.id}`}>
-      {a.title || 'まとめ'}（{a.solve_ids.length}件）
+      {multiTitle(a)}
     </Link>
   )
 }

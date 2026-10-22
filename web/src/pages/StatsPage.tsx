@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { listAnalyses, type Analysis, type SolveMode } from '../api'
 import { AnalysisHowTo } from '../components/AnalysisCard'
 import { HistogramChart, TrendChart } from '../components/charts'
-import { formatDate, MODE_LABELS } from '../format'
+import { formatDate, MODE_LABELS, multiTitle } from '../format'
 import { bests, histogram, stageStats, trend } from '../solve/aggregate'
 import { GROUP_LABELS, STAGE_LABELS, STAGES, type StageGroup } from '../solve/cfop'
 import { useSolveList } from '../solve/hooks'
@@ -275,7 +275,7 @@ function RecentMultiAnalyses() {
           {list.map((a) => (
             <li key={a.id}>
               <Link to={`/analyses/${a.id}`}>
-                {a.title || 'まとめ'}（{a.solve_ids.length}件）
+                {multiTitle(a)}
               </Link>{' '}
               <span className="muted small">{formatDate(a.created_at)}</span>
             </li>
