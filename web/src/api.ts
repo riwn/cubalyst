@@ -170,7 +170,7 @@ export function setCaseLearned(id: string, learned: boolean): Promise<void> {
 
 export type AnalysisKind = 'solve' | 'multi'
 
-/** 解析結果。単体（solve）は1回のソルブ、まとめ（multi）は複数のソルブを対象にする。解析は MCP 経由の Claude が書く。 */
+/** 解析結果。単体（solve）は1回のソルブ、まとめ（multi）は複数のソルブを対象にする。解析は MCP でつないだ AI が書く。 */
 export type Analysis = {
   id: number
   kind: AnalysisKind

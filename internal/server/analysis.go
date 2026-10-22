@@ -11,7 +11,7 @@ import (
 	"cubalyst/internal/solves"
 )
 
-// 解析は MCP 経由の Claude が行う。サーバーは入力データを渡し、書かれた結果を保存する。
+// 解析は MCP でつないだ AI が行う。サーバーは入力データを渡し、書かれた結果を保存する。
 
 type analysisInput struct {
 	Input    string  `json:"input"`
@@ -65,7 +65,7 @@ func parseSelection(q url.Values) (analysis.Selection, error) {
 	return sel, nil
 }
 
-// handleSaveAnalysis は Claude が書いた解析結果を保存する。
+// handleSaveAnalysis は AI が書いた解析結果を保存する。
 func (s *Server) handleSaveAnalysis(w http.ResponseWriter, r *http.Request) {
 	var in analysis.SaveRequest
 	if err := decodeJSON(r, &in); err != nil {

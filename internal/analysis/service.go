@@ -55,9 +55,9 @@ const (
 )
 
 // ExternalModel は、解析結果のモデル名が空のときに使う名前。
-const ExternalModel = "Claude（MCP）"
+const ExternalModel = "AI（MCP）"
 
-// Service は解析の入力データ作りと、解析結果の保存を行う。解析そのものはアプリの外（MCP 経由の Claude）で行う。
+// Service は解析の入力データ作りと、解析結果の保存を行う。解析そのものはアプリの外（MCP でつないだ AI）で行う。
 type Service struct {
 	db       *sql.DB
 	solves   *solves.Store

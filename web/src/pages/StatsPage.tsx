@@ -267,7 +267,7 @@ function RecentMultiAnalyses() {
   return (
     <section className="panel">
       <div className="row">
-        <h3>まとめ解析（Claude）</h3>
+        <h3>まとめ解析（AI）</h3>
         <span className="spacer" />
         <Link to="/analyses?kind=multi">すべて見る</Link>
       </div>

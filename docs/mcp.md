@@ -1,12 +1,14 @@
-# MCP で Claude から解析する（API キーなし）
+# MCP で AI から解析する（API キーなし）
 
 `cubalyst mcp` は、Cubalyst の記録を [MCP](https://modelcontextprotocol.io/) のツールとして公開する小さなサーバーです。
-Claude Code や Claude Desktop に登録すると、チャットで「直近のソルブを解析して」と頼むだけで、Claude がソルブを読んで解析し、結果をアプリに保存します。
+MCP に対応した AI ツール（Claude Code、Claude Desktop、Codex CLI など）に登録すると、チャットで「直近のソルブを解析して」と頼むだけで、AI がソルブを読んで解析し、結果をアプリに保存します。
 
-**API キーは要りません**。使った分は、Claude のプランの利用枠から差し引かれます。
+**API キーは要りません**。使った分は、使っている AI ツールのプランの利用枠から差し引かれます。
+
+動作を確かめているのは Claude Code と Claude Desktop です。ほかのツールでも、標準入出力でつなぐ MCP サーバー（ローカルの MCP サーバー）を登録できれば同じように使えるはずです。
 
 ```
-Claude Code / Claude Desktop
+AI ツール（Claude Code / Claude Desktop / Codex CLI など）
    │ 標準入出力（MCP）
    ▼
  cubalyst mcp
@@ -27,14 +29,14 @@ Claude Code / Claude Desktop
 | `list_analyses` | 保存済みの解析結果 |
 | `save_analysis` | 解析結果（Markdown）を保存する。単体は `kind=solve`・`solve_id`、まとめは `kind=multi`・`solve_ids`・`title`。アプリの「解析」画面に表示される |
 
-解析の観点と出力の形式（日本語の Markdown、結論から書く、など）は、接続時に Claude へ渡しています。
+解析の観点と出力の形式（日本語の Markdown、結論から書く、など）は、接続時に MCP サーバーの説明（instructions）として AI へ渡しています。
 
 決まった頼み方を、プロンプトとしても用意しています。
 
 - `analyze_solve`（引数 `solve_id`、省くと直近）：1回のソルブを解析して保存する
 - `analyze_recent`（引数 `limit`、既定 20）：直近 N 件をまとめて解析し、まとめとして保存する
 
-Claude Code では `/mcp__cubalyst__analyze_solve` のように、スラッシュコマンドとして呼べます。
+プロンプトをどう呼べるかは AI ツールによります。たとえば Claude Code では `/mcp__cubalyst__analyze_solve` のように、スラッシュコマンドとして呼べます。
 
 ## 使う前に
 
@@ -43,6 +45,15 @@ Claude Code では `/mcp__cubalyst__analyze_solve` のように、スラッシ�
 - サーバーが、MCP 用の API（`/api/solves/{id}/analysis-input` など）を含む版であること
 
 以下、`<cubalyst>` を、サーバーのマシン上の `cubalyst` バイナリの絶対パスに読み替えてください（常駐サービスの `ExecStart` に書いてあるもの）。
+
+## 登録のしかた（どの AI ツールでも共通）
+
+登録するのは、標準入出力でつなぐ MCP サーバーです。AI ツールの MCP の設定に、次のどちらかのコマンドを書きます。
+
+- **AI ツールがサーバーと同じマシンで動く**：`<cubalyst> mcp`
+- **AI ツールが別の PC で動く**：`ssh -T -o BatchMode=yes <サーバー> <cubalyst> mcp`（SSH 越しに起動し、標準入出力をそのままつなぐ。下の「Claude Desktop」の節を参照）
+
+以下は、ツールごとの設定例です。
 
 ## Claude Code（サーバーと同じマシン）
 
@@ -61,6 +72,18 @@ claude mcp add -s user cubalyst -- <cubalyst> mcp
 ツールを使うたびに許可を求められます。毎回許可したくなければ、確認のときに「今後は聞かない」を選んでください。
 
 やめるときは `claude mcp remove -s user cubalyst` です。
+
+## Codex CLI（サーバーと同じマシン）
+
+`~/.codex/config.toml` に次を足します（この手順は Cubalyst では試していません）。
+
+```toml
+[mcp_servers.cubalyst]
+command = "<cubalyst>"
+args = ["mcp"]
+```
+
+Codex CLI を起動し直すと、`cubalyst` のツールが使えるようになります。
 
 ## Claude Desktop（別の PC から SSH 越し）
 
@@ -102,9 +125,9 @@ Claude Desktop の「設定 → 開発者 → 設定を編集」で開く `claud
 ## スキル（解析の進め方とコーチの知識）
 
 MCP はデータの出し入れだけを受け持ちます。どう解析するか（前回の指摘との比較、レベルに合った助言、アプリの練習への落とし込み）は、スキル `cubalyst-coach`（[skills/cubalyst-coach/](../skills/cubalyst-coach/SKILL.md)）にまとめています。
-「ソルブを解析して」「何を練習すればいい？」のような頼み方に合うと Claude が自動で読み込み、MCP のツールを使って解析します。
+「ソルブを解析して」「何を練習すればいい？」のような頼み方に合うと AI ツールが自動で読み込み、MCP のツールを使って解析します。
 
-MCP の登録とあわせて入れておくと、解析の質が揃います。
+MCP の登録とあわせて入れておくと、解析の質が揃います。スキルは `SKILL.md` を置く形式（Agent Skills）なので、この形式に対応したツールなら同じものを使えます。ここでは Claude Code と Claude Desktop での入れ方を載せます。スキルを入れなくても、MCP だけで解析はできます。
 
 ### Claude Code
 
@@ -129,6 +152,6 @@ skills/install.sh --zip
 
 ## 注意
 
-- **claude.ai（ブラウザ）や Claude のスマホアプリからは使えません。** これらのカスタムコネクタは Anthropic のサーバーから接続しに来るので、インターネットに公開していないサーバーには届きません
-- Claude が書いた解析結果はそのまま保存されます。画面では、アプリ内の解析と同じ場所に、モデル名「Claude（MCP）」（または Claude が名乗ったモデル名）で表示されます。不要なら画面の「⋯」から削除できます
+- **ブラウザやスマホアプリのチャット（claude.ai、ChatGPT など）からは使えません。** これらのコネクタはサービス側のサーバーから接続しに来るので、インターネットに公開していないサーバーには届きません
+- AI が書いた解析結果はそのまま保存されます。画面の「AI解析」に、AI が名乗ったモデル名（名乗らなかったときは「AI（MCP）」）で表示されます。不要なら画面の「⋯」から削除できます
 - `cubalyst mcp` が呼ぶのは、記録の読み出しと解析結果の追加だけです。ソルブの削除や書き換えはできません
