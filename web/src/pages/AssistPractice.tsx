@@ -70,7 +70,7 @@ export function AssistPractice() {
   return (
     <div className="assist-practice">
       <section className="panel row">
-        <span className="muted small">計測中に、F2L・OLL・PLL のケースと手順を表示します。記録は「補助付き」として、タイマーとは別に保存します。</span>
+        <span className="muted small hide-narrow">計測中に、F2L・OLL・PLL のケースと手順を表示します。記録は「補助付き」として、タイマーとは別に保存します。</span>
         <span className="spacer" />
         <label className="small">
           手順を出すまで{' '}

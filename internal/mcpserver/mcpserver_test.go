@@ -134,7 +134,7 @@ func TestTools(t *testing.T) {
 	}
 
 	out, _ = call(t, cs, "list_analyses", map[string]any{"solve_id": 1})
-	if !strings.Contains(out, "単体：ソルブ #1") || !strings.Contains(out, "Claude（MCP）") || strings.Contains(out, "まとめ") {
+	if !strings.Contains(out, "単体：ソルブ #1") || !strings.Contains(out, "AI（MCP）") || strings.Contains(out, "まとめ") {
 		t.Fatalf("list_analyses solve: %s", out)
 	}
 	out, _ = call(t, cs, "list_analyses", map[string]any{"kind": "multi"})

@@ -55,7 +55,7 @@ export function CubeConnectionControl() {
       trigger={
         <>
           <span className={`status-dot ${state.resyncCount > 0 ? 'status-dot--warn' : 'status-dot--on'}`} aria-hidden />
-          {connection.info.deviceName}
+          <span className="conn-name">{connection.info.deviceName}</span>
           {battery != null && <span className={low ? 'error' : 'muted'}> {battery}%</span>}
         </>
       }

@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { CubeView } from '../components/CubeView'
+import { FitLayout } from '../components/FitLayout'
 import { ManualTimer } from '../components/ManualTimer'
 import { MockControls } from '../components/MockControls'
 import { MoveLog } from '../components/MoveLog'
@@ -40,42 +41,46 @@ export function TimerPage() {
   )
 
   return (
-    <div className="timer-page">
-      {session && state && status === 'disconnected' && (
-        <ManualTimer
-          scramble={state.exercise?.scramble}
-          inspection={settings.inspection}
-          onNext={() => void session.next()}
-        />
-      )}
-      {session && state && status !== 'disconnected' && (
+    <FitLayout
+      className="timer-page"
+      main={
         <>
-          <ScrambleDisplay session={session} state={state} />
-          <TimerDisplay state={state} />
-          {state.phase !== 'running' && last && <StageRibbon key={last.solved_at} splits={lastSplits} />}
+          {session && state && status === 'disconnected' && (
+            <ManualTimer
+              scramble={state.exercise?.scramble}
+              inspection={settings.inspection}
+              onNext={() => void session.next()}
+            />
+          )}
+          {session && state && status !== 'disconnected' && (
+            <>
+              <ScrambleDisplay session={session} state={state} />
+              <TimerDisplay state={state} />
+              {state.phase !== 'running' && last && <StageRibbon key={last.solved_at} splits={lastSplits} />}
+            </>
+          )}
+          {status === 'disconnected' && (
+            <p className="muted center small">右上の「Connect」でキューブを接続すると、回転を記録して保存できます</p>
+          )}
+          {saveError && <p className="error">{saveError}</p>}
         </>
-      )}
-      {status === 'disconnected' && (
-        <p className="muted center">右上の「Connect」でキューブを接続すると、回転を記録して保存できます</p>
-      )}
-      {saveError && <p className="error">{saveError}</p>}
-      <div className="timer-grid">
-        <div>
-          <CubeView />
-        </div>
-        <div>
+      }
+      cube={<CubeView />}
+      sideLabel="直近の記録"
+      side={
+        <>
           <RecentSolves solves={recent.solves} onChange={reload} />
           {state && <MockControls {...mockShortcuts(state)} />}
-        </div>
-      </div>
-      {debug && (
-        <details className="debug" open>
-          <summary>デバッグ情報（回転ログ・facelets）</summary>
-          <MoveLog />
-          <FaceletsInfo />
-        </details>
-      )}
-    </div>
+          {debug && (
+            <details className="debug" open>
+              <summary>デバッグ情報（回転ログ・facelets）</summary>
+              <MoveLog />
+              <FaceletsInfo />
+            </details>
+          )}
+        </>
+      }
+    />
   )
 }
 

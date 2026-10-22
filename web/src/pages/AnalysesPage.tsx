@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { getAnalysis, listAnalyses, type Analysis, type AnalysisKind } from '../api'
 import { AnalysisCard, AnalysisHowTo } from '../components/AnalysisCard'
+import { AnalysisTabs } from '../components/AnalysisTabs'
 import { formatDate, KIND_LABELS, MODE_LABELS } from '../format'
 import { GROUP_LABELS, groupSplits, type StageGroup } from '../solve/cfop'
 import { useSolveList } from '../solve/hooks'
@@ -37,6 +38,7 @@ export function AnalysesPage() {
 
   return (
     <div className="analyses-page">
+      <AnalysisTabs />
       <section className="panel">
         <div className="row">
           {KINDS.map((k) => (

@@ -103,7 +103,7 @@ export function AnalysisCard({
 export function AnalysisHowTo() {
   return (
     <p className="muted small">
-      解析は、Claude Code や Claude Desktop で <code>/cubalyst-coach</code> を呼ぶか、「直近のソルブを解析して」「直近20件をまとめて見て」のように頼むと、ここに保存されます（MCP
+      解析は、MCP でつないだ AI ツール（Claude Code、Claude Desktop、Codex CLI など）に「直近のソルブを解析して」「直近20件をまとめて見て」のように頼むと、ここに保存されます（MCP
       の設定は docs/mcp.md）。
     </p>
   )

@@ -1,7 +1,7 @@
 // Package mcpserver は Cubalyst のデータを MCP のツールとして公開する（`cubalyst mcp`）。
 //
-// DB には直接触らず、動いている Cubalyst の HTTP API を呼ぶ。Claude Code や Claude Desktop から
-// ソルブを読み、Claude 自身が書いた解析結果をアプリに保存できる（API キーは要らない）。
+// DB には直接触らず、動いている Cubalyst の HTTP API を呼ぶ。MCP に対応した AI ツール（Claude Code など）から
+// ソルブを読み、AI 自身が書いた解析結果をアプリに保存できる（API キーは要らない）。
 package mcpserver
 
 import (
@@ -23,7 +23,7 @@ import (
 	"cubalyst/internal/solves"
 )
 
-// Instructions は接続した Claude に渡す前提。
+// Instructions は接続した AI に渡す前提。
 const Instructions = `Cubalyst は、スマートキューブで記録したルービックキューブ（3x3、CFOP法）のソルブを集計するアプリです。
 このサーバーのツールで、ソルブの記録を読み、解析結果をアプリに保存できます。
 

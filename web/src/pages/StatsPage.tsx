@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { listAnalyses, type Analysis, type SolveMode } from '../api'
 import { AnalysisHowTo } from '../components/AnalysisCard'
+import { AnalysisTabs } from '../components/AnalysisTabs'
 import { HistogramChart, TrendChart } from '../components/charts'
 import { formatDate, MODE_LABELS, multiTitle } from '../format'
 import { bests, histogram, stageStats, trend } from '../solve/aggregate'
@@ -78,6 +79,7 @@ export function StatsPage() {
 
   return (
     <div className="stats-page">
+      <AnalysisTabs />
       <section className="panel row">
         <label>
           モード{' '}
@@ -265,7 +267,7 @@ function RecentMultiAnalyses() {
   return (
     <section className="panel">
       <div className="row">
-        <h3>まとめ解析（Claude）</h3>
+        <h3>まとめ解析（AI）</h3>
         <span className="spacer" />
         <Link to="/analyses?kind=multi">すべて見る</Link>
       </div>

@@ -56,33 +56,26 @@ body {
   outline-offset: 2px;
 }
 
+/* 画面の骨組み：上にヘッダー、左にメニュー、右に本文 */
 .app {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 0 16px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  min-height: 100dvh;
 }
 
 .app-header {
+  grid-column: 1 / -1;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px 28px;
-  padding: 14px 0;
+  gap: 8px 12px;
+  padding: 10px 16px;
+  background: var(--mat);
+  border-bottom: 1px solid var(--line);
   /* スクロールしても上部に固定する */
   position: sticky;
   top: 0;
   z-index: 30;
-}
-
-/* 固定ヘッダーの背景。.app の外（画面の左右の端）まで広げて、下を流れる内容を隠す。
-   clip-path などで切るとヘッダーから下に開くメニューまで切れるので、疑似要素で敷く */
-.app-header::before {
-  content: '';
-  position: absolute;
-  inset: 0 -100vmax;
-  z-index: -1;
-  background: var(--mat);
-  border-bottom: 1px solid var(--line);
 }
 
 .app-header h1 {
@@ -94,44 +87,137 @@ body {
   line-height: 1;
 }
 
-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  flex: 1;
-}
-
-nav a {
-  padding: 5px 14px;
-  border-radius: 999px;
-  color: var(--mute);
+.app-header h1 a {
+  color: inherit;
   text-decoration: none;
 }
 
-nav a:hover {
+.nav-toggle {
+  color: var(--mute);
+  border-color: transparent;
+  background: transparent;
+}
+
+.side-nav {
+  position: sticky;
+  top: var(--header-h, 52px);
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 168px;
+  height: calc(100dvh - var(--header-h, 52px));
+  padding: 12px 8px;
+  border-right: 1px solid var(--line);
+  background: var(--mat);
+  z-index: 20;
+}
+
+.side-nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: var(--mute);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.side-nav a:hover {
   color: var(--ink);
 }
 
-@media (max-width: 640px) {
-  .app-header {
-    gap: 8px 12px;
+.side-nav a svg {
+  flex: none;
+}
+
+.side-nav a.active {
+  color: var(--face-ink);
+  background: var(--face);
+  font-weight: 700;
+}
+
+/* 畳んだときはアイコンだけ */
+.app--nav-collapsed .side-nav {
+  width: 57px;
+}
+
+.app--nav-collapsed .side-nav-label {
+  display: none;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 8px 16px 48px;
+}
+
+.app-main > * {
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+}
+
+/* 狭い画面：メニューはふだん隠し、☰ で本文の上に重ねて開く */
+@media (max-width: 800px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  nav {
-    order: 3;
-    flex-basis: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
+  .side-nav,
+  .app--nav-collapsed .side-nav {
+    position: fixed;
+    left: 0;
+    width: 220px;
+    transform: translateX(-100%);
+    transition: transform 0.15s ease-out;
+    visibility: hidden;
   }
 
-  nav a {
-    white-space: nowrap;
+  .app--drawer .side-nav {
+    transform: none;
+    visibility: visible;
+    box-shadow: 6px 0 24px color-mix(in srgb, var(--ink) 20%, transparent);
+  }
+
+  .app--nav-collapsed .side-nav-label {
+    display: inline;
+  }
+
+  .nav-backdrop {
+    position: fixed;
+    inset: var(--header-h, 52px) 0 0;
+    z-index: 15;
+    background: color-mix(in srgb, var(--ink) 25%, transparent);
   }
 }
 
-nav a.active {
-  color: var(--face-ink);
+@media (min-width: 801px) {
+  .nav-backdrop {
+    display: none;
+  }
+}
+
+/* 中のタブ（解析の統計・履歴・AI解析）。ボタンと同じ見た目のリンク */
+a.button-link {
+  padding: 5px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+a.button-link:hover {
+  border-color: var(--ink);
+}
+
+a.button-link.on-accent {
+  border-color: var(--face);
   background: var(--face);
+  color: var(--face-ink);
   font-weight: 700;
 }
 
@@ -162,10 +248,6 @@ nav a.active {
 
 .muted {
   color: var(--mute);
-}
-
-main {
-  padding: 8px 0 48px;
 }
 
 h2 {
@@ -300,23 +382,151 @@ code {
   width: 14em;
 }
 
-.timer-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
-  gap: 16px;
-  margin-top: 24px;
+/* 計測する画面：スクロールせずに1画面へ収める（FitLayout）。
+   本文の高さを画面に合わせ、間の要素も縦の flex にして、残りの高さをキューブに回す */
+.app:has(.fit-screen) {
+  height: 100dvh;
 }
 
-@media (max-width: 800px) {
-  .timer-grid {
-    grid-template-columns: minmax(0, 1fr);
+.app:has(.fit-screen) .app-main {
+  min-height: 0;
+  padding-bottom: 12px;
+  overflow-y: auto;
+}
+
+.app-main div:has(.fit-screen),
+.fit-screen {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.app-main div:has(.fit-screen) > :not(:has(.fit-screen)):not(.fit-screen) {
+  flex: none;
+}
+
+.fit-layout {
+  position: relative;
+}
+
+.fit-main {
+  min-width: 0;
+}
+
+.fit-cube {
+  position: relative;
+  min-height: 0;
+}
+
+/* 枠の大きさは配置で決まるので、キューブはそこへ重ねて広げる */
+.fit-cube > .cube-view {
+  position: absolute;
+  inset: 0;
+}
+
+.fit-side-toggle {
+  display: none;
+}
+
+@media (min-width: 801px) {
+  .fit-screen.fit-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      'main cube'
+      'side cube';
+    gap: 8px 24px;
+  }
+
+  .fit-main {
+    grid-area: main;
+  }
+
+  .fit-cube {
+    grid-area: cube;
+  }
+
+  .fit-side {
+    grid-area: side;
+    min-height: 0;
+    overflow-y: auto;
   }
 }
 
-.cube-view {
-  width: 100%;
-  aspect-ratio: 1;
-  max-height: 480px;
+@media (max-width: 800px) {
+  .fit-main {
+    flex: none;
+  }
+
+  .fit-cube {
+    flex: 1;
+    min-height: 120px;
+  }
+
+  .fit-side-toggle {
+    display: block;
+    flex: none;
+    align-self: center;
+    margin-top: 4px;
+    font-size: 0.85rem;
+  }
+
+  .fit-side {
+    display: none;
+    position: absolute;
+    right: 0;
+    bottom: 40px;
+    left: 0;
+    z-index: 5;
+    max-height: 70%;
+    padding: 8px;
+    overflow-y: auto;
+    background: var(--mat);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 -6px 24px color-mix(in srgb, var(--ink) 18%, transparent);
+  }
+
+  .fit-layout--side-open .fit-side {
+    display: block;
+  }
+
+  /* 計測する画面の上の操作欄（練習の種類・ステップの選択など）は1行に詰め、はみ出す分は横に送る */
+  .app-main div:has(.fit-screen) > .mode-tabs,
+  .app-main div:has(.fit-screen) > .panel.row,
+  .fit-main > .row {
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin-bottom: 6px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .app-main div:has(.fit-screen) > .panel.row {
+    padding: 6px 8px;
+  }
+
+  .app-main div:has(.fit-screen) > .mode-tabs button,
+  .app-main div:has(.fit-screen) > .panel.row button,
+  .fit-main > .row button {
+    flex: none;
+    padding: 3px 10px;
+  }
+
+  .fit-main .scramble-moves {
+    font-size: 1.2rem;
+  }
+
+  .fit-main .correction-slot {
+    min-height: 1.6rem;
+  }
+
+  /* 説明文は狭い画面では省く */
+  .hide-narrow {
+    display: none;
+  }
 }
 
 .facelets-info dt {
@@ -1179,6 +1389,25 @@ a.kind-badge:hover {
   white-space: nowrap;
 }
 
+/* 狭い画面では、デバイス名が長くても右上の ⚙ を押し出さないように省略する */
+@media (max-width: 640px) {
+  .app-header {
+    gap: 6px;
+    padding-inline: 10px;
+  }
+
+  .header-right {
+    min-width: 0;
+  }
+
+  .conn-name {
+    display: inline-block;
+    max-width: 5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 .icon-button {
   padding: 4px 8px;
   line-height: 1;
@@ -1187,6 +1416,14 @@ a.kind-badge:hover {
 .system-icon {
   font-size: 1rem;
   color: var(--mute);
+}
+
+.system-settings-link {
+  display: block;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  font-weight: 700;
 }
 
 .status-dot {
