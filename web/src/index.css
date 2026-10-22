@@ -484,6 +484,40 @@ code {
   color: var(--error);
 }
 
+/* 手動タイマー（キューブ未接続）：長押し中は赤、離せばスタートできるようになったら緑 */
+.manual-timer {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.timer.timer--holding .timer-time {
+  color: var(--error);
+}
+
+.timer.timer--armed .timer-time {
+  color: var(--ok);
+}
+
+.manual-results {
+  max-width: 720px;
+  margin: 8px auto 0;
+  padding: 0 16px;
+  text-align: center;
+}
+
+.manual-results-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
 /* CFOP の帯：直前のソルブで各段階にかかった時間を長さで表す */
 .stage-ribbon {
   max-width: 720px;
