@@ -16,3 +16,10 @@ export function formatDate(iso: string): string {
     minute: '2-digit',
   })
 }
+
+/** まとめ解析の見出し。見出しに対象の件数が入っていなければ「（N件）」を足す。 */
+export function multiTitle(a: { title: string; solve_ids: number[] }): string {
+  const title = a.title || 'まとめ'
+  const count = `${a.solve_ids.length}件`
+  return title.includes(count) ? title : `${title}（${count}）`
+}

@@ -21,7 +21,7 @@ import { convertMove } from '../cube/orientation'
 import { useHoldFrame, useSettings } from '../settings/hooks'
 import { computeSplits, COLOR_LABELS } from '../solve/cfop'
 import { effectiveTime, formatTime, type Penalty } from '../solve/stats'
-import { formatDate, isFullSolve, MODE_LABELS } from '../format'
+import { formatDate, isFullSolve, MODE_LABELS, multiTitle } from '../format'
 
 /** ソルブ詳細：段階タイム、スクランブル、解法、ペナルティ・メモ編集。 */
 export function SolveDetailPage() {
@@ -200,7 +200,7 @@ function SolveAnalyses({ solveId }: { solveId: number }) {
             {multis.map((a) => (
               <li key={a.id}>
                 <Link to={`/analyses/${a.id}`}>
-                  {a.title || 'まとめ'}（{a.solve_ids.length}件）
+                  {multiTitle(a)}
                 </Link>{' '}
                 <span className="muted small">{formatDate(a.created_at)}</span>
               </li>
