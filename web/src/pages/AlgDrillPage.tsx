@@ -7,6 +7,7 @@ import { scrambleBetween } from '../cases/exercise'
 import { invertRotation, normalizeOrientation } from '../cases/geometry'
 import { caseStats } from '../cases/stats'
 import { CaseDiagram } from '../components/CaseDiagram'
+import { FitLayout } from '../components/FitLayout'
 import { CubeView } from '../components/CubeView'
 import { useCubeState, useCubeStore } from '../cube/hooks'
 import { MockConnection, parseMoveLog } from '../cube/mock'
@@ -251,60 +252,62 @@ function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBa
   }
 
   return (
-    <div className="drill-view">
-      <div className="row">
-        <button onClick={onBack}>← ケースを選び直す</button>
-        <span className="spacer" />
-        <label className="small">
-          目標{' '}
-          <input
-            type="number"
-            min={0.1}
-            step={0.1}
-            value={target}
-            onChange={(e) => changeTarget(Number(e.target.value))}
-            style={{ width: '5em' }}
-          />{' '}
-          秒
-        </label>
-        <button onClick={() => drill?.reset()} title="回しかけを捨てて、今の状態から数え直す">
-          数え直す
-        </button>
-      </div>
-
-      <section className="panel drill-head">
-        <CaseDiagram c={c} size={88} />
-        <div>
-          <strong>{c.name}</strong>
-          <div className="alg drill-alg">{alg}</div>
-          <div className="muted small">
-            揃っていなくても大丈夫です。手順を回し終えるたびに自動で記録します（前後のAUF・別の面での実行もOK）。
+    <FitLayout
+      className="drill-view"
+      main={
+        <>
+          <div className="row">
+            <button onClick={onBack}>← ケースを選び直す</button>
+            <span className="spacer" />
+            <label className="small">
+              目標{' '}
+              <input
+                type="number"
+                min={0.1}
+                step={0.1}
+                value={target}
+                onChange={(e) => changeTarget(Number(e.target.value))}
+                style={{ width: '5em' }}
+              />{' '}
+              秒
+            </label>
+            <button onClick={() => drill?.reset()} title="回しかけを捨てて、今の状態から数え直す">
+              数え直す
+            </button>
           </div>
-        </div>
-      </section>
 
-      {status === 'disconnected' && <p className="muted center">右上の「Connect」でキューブを接続すると練習できます</p>}
+          <section className="panel drill-head">
+            <CaseDiagram c={c} size={88} />
+            <div>
+              <strong>{c.name}</strong>
+              <div className="alg drill-alg">{alg}</div>
+              <div className="muted small hide-narrow">
+                揃っていなくても大丈夫です。手順を回し終えるたびに自動で記録します（前後のAUF・別の面での実行もOK）。
+              </div>
+            </div>
+          </section>
 
-      <section className={`timer ${moving ? 'timer--running' : last != null && last <= targetMs ? 'drill--good' : ''}`}>
-        <div className="timer-time">
-          {moving ? formatTime(Math.max(0, now - state.startedAt!), 2) : last != null ? formatTime(last, 3) : '0.000'}
-        </div>
-        <div className="timer-hint">
-          {moving
-            ? `${state.moveCount}手`
-            : last != null
-              ? last <= targetMs
-                ? `目標（${target}秒）以内！`
-                : `目標まで ${((last - targetMs) / 1000).toFixed(2)}秒`
-              : '手順を回すと計測します'}
-        </div>
-      </section>
+          {status === 'disconnected' && <p className="muted center small">右上の「Connect」でキューブを接続すると練習できます</p>}
 
-      <div className="timer-grid">
-        <div>
-          <CubeView hold={hold} />
-        </div>
-        <div>
+          <section className={`timer ${moving ? 'timer--running' : last != null && last <= targetMs ? 'drill--good' : ''}`}>
+            <div className="timer-time">
+              {moving ? formatTime(Math.max(0, now - state.startedAt!), 2) : last != null ? formatTime(last, 3) : '0.000'}
+            </div>
+            <div className="timer-hint">
+              {moving
+                ? `${state.moveCount}手`
+                : last != null
+                  ? last <= targetMs
+                    ? `目標（${target}秒）以内！`
+                    : `目標まで ${((last - targetMs) / 1000).toFixed(2)}秒`
+                  : '手順を回すと計測します'}
+            </div>
+          </section>
+        </>
+      }
+      cube={<CubeView hold={hold} />}
+      side={
+        <>
           <section className="panel">
             <div className="averages">
               <div>
@@ -344,13 +347,12 @@ function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBa
           </section>
           {saveError && <p className="error">{saveError}</p>}
           {debug && connection instanceof MockConnection && <MockDrillButton mock={connection} alg={alg} rotation={rotation} />}
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    />
   )
 }
 
-/** デバッグ用：モックで手順を1回実行する（同じ効果の外層回転に直して回す）。 */
 function MockDrillButton({ mock, alg, rotation }: { mock: MockConnection; alg: string; rotation: string }) {
   const store = useCubeStore()
   const [busy, setBusy] = useState(false)

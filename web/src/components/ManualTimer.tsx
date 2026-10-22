@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { initialManualTimer, isArmed, manualTimerReducer, type ManualResult } from '../solve/manual-timer'
 import { INSPECTION_DNF_MS, INSPECTION_MS } from '../solve/session'
 import { averageOf, effectiveTime, formatTime } from '../solve/stats'
@@ -88,12 +88,14 @@ export function ManualTimer({
   }, [animating])
 
   const armed = isArmed(state, now)
+  // スマホ・タブレットでは Space の代わりにタイマーをタッチする
+  const key = useMemo(() => (window.matchMedia('(pointer: coarse)').matches ? 'タッチ' : 'Space '), [])
   let time: string
   let hint: string
   let mod = ''
   if (phase === 'running' && startedAt != null) {
     time = formatTime(Math.max(0, now - startedAt), 2)
-    hint = `Space で停止${state.penalty ? `（インスペクション超過：${state.penalty}）` : ''}`
+    hint = `${key}で停止${state.penalty ? `（インスペクション超過：${state.penalty}）` : ''}`
     mod = 'timer--running'
   } else if (holdStart != null) {
     time = phase === 'inspecting' ? inspectionText(now - (inspectStart ?? now)) : '0.00'
@@ -102,7 +104,7 @@ export function ManualTimer({
   } else if (phase === 'inspecting' && inspectStart != null) {
     const elapsed = Math.max(0, now - inspectStart)
     time = inspectionText(elapsed)
-    hint = 'インスペクション中：Space を長押しして離すとスタート'
+    hint = `インスペクション中：${key}を長押しして離すとスタート`
     mod =
       elapsed > INSPECTION_MS
         ? 'timer--inspecting timer--over'
@@ -111,7 +113,7 @@ export function ManualTimer({
           : 'timer--inspecting'
   } else {
     time = last ? formatTime(effectiveTime(last.ms, last.penalty), 3) : '0.000'
-    hint = inspection ? 'Space でインスペクション開始' : 'Space を長押しして離すとスタート'
+    hint = inspection ? `${key}でインスペクション開始` : `${key}を長押しして離すとスタート`
     mod = 'timer--idle'
   }
 
@@ -121,9 +123,11 @@ export function ManualTimer({
   return (
     <>
       <section className="scramble">
-        <p className="scramble-moves">
-          {scramble ? scramble.split(' ').map((m, i) => <span key={i} className="scramble-move">{m}</span>) : '…'}
-        </p>
+        {phase !== 'running' && (
+          <p className="scramble-moves">
+            {scramble ? scramble.split(' ').map((m, i) => <span key={i} className="scramble-move">{m}</span>) : '…'}
+          </p>
+        )}
         <div className="row scramble-actions">
           {phase === 'idle' && (
             <button className="icon-button" onClick={onNext} title="新しいスクランブル" aria-label="新しいスクランブル">
@@ -163,7 +167,7 @@ export function ManualTimer({
             ao5 {formatTime(ao(5))} ・ ao12 {formatTime(ao(12))} ・ {results.length}回（キューブ未接続のため保存されません）
           </p>
           <ol className="manual-results-list">
-            {results.slice(0, 12).map((r, i) => (
+            {results.slice(0, 5).map((r, i) => (
               <li key={results.length - i}>
                 {formatTime(effectiveTime(r.ms, r.penalty), 2)}
                 {r.penalty === '+2' && <span className="muted">（+2）</span>}

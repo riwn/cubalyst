@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { exportUrl, type ExportFormat, type Solve, type SolveFilter, type SolveMode } from '../api'
+import { AnalysisTabs } from '../components/AnalysisTabs'
 import { formatDate, KIND_LABELS, MODE_LABELS } from '../format'
 import { GROUP_LABELS, groupSplits, type StageGroup } from '../solve/cfop'
 import { useSolveList } from '../solve/hooks'
@@ -49,6 +50,7 @@ export function HistoryPage() {
 
   return (
     <div className="history-page">
+      <AnalysisTabs />
       <section className="panel row">
         <label>
           モード{' '}

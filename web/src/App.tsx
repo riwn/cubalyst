@@ -1,5 +1,5 @@
-import { useCallback, useRef, type ReactNode } from 'react'
-import { NavLink, Route, Routes } from 'react-router'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Link, NavLink, Route, Routes, useLocation } from 'react-router'
 import { SystemMenu } from './HealthStatus'
 import { CubeConnectionControl, CubeNotices } from './components/ConnectionPanel'
 import { CubeStoreProvider } from './cube/CubeStoreProvider'
@@ -11,15 +11,42 @@ import { SolveDetailPage } from './pages/SolveDetailPage'
 import { StatsPage } from './pages/StatsPage'
 import { TimerPage } from './pages/TimerPage'
 import { SettingsProvider } from './settings/SettingsProvider'
+import { setNavCollapsed, useNavCollapsed } from './ui/prefs'
 
-const pages: { path: string; label: string; end?: boolean; element?: ReactNode }[] = [
-  { path: '/', label: 'タイマー', end: true, element: <TimerPage /> },
-  { path: '/practice', label: '練習', element: <PracticePage /> },
-  { path: '/history', label: '履歴', element: <HistoryPage /> },
-  { path: '/stats', label: '統計', element: <StatsPage /> },
-  { path: '/analyses', label: '解析', element: <AnalysesPage /> },
-  { path: '/settings', label: '設定', element: <SettingsPage /> },
+/** 左のメニュー。match に当てはまるパスでも選択中にする（解析は統計・履歴・解析の3つのタブをまとめる）。 */
+const NAV: { to: string; label: string; icon: ReactNode; end?: boolean; match?: RegExp }[] = [
+  {
+    to: '/',
+    label: 'タイマー',
+    end: true,
+    icon: (
+      <>
+        <circle cx="12" cy="13" r="8" />
+        <path d="M12 9v4l2.5 2.5M9.5 2h5M12 2v3" />
+      </>
+    ),
+  },
+  {
+    to: '/practice',
+    label: '練習',
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="5" />
+        <circle cx="12" cy="12" r="1.2" />
+      </>
+    ),
+  },
+  {
+    to: '/stats',
+    label: '解析',
+    match: /^\/(stats|history|analyses)(\/|$)/,
+    icon: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
+  },
 ]
+
+/** 左のメニューを重ねて開く（畳めない）画面幅。CSS の @media と合わせる。 */
+const NARROW = '(max-width: 800px)'
 
 function Placeholder({ title }: { title: string }) {
   return (
@@ -49,30 +76,78 @@ function useHeaderHeight() {
 
 export default function App() {
   const headerRef = useHeaderHeight()
+  const collapsed = useNavCollapsed()
+  // 狭い画面で、重ねて開いているか
+  const [drawer, setDrawer] = useState(false)
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    if (!drawer) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawer(false)
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [drawer])
+
+  const toggleNav = () => {
+    if (window.matchMedia(NARROW).matches) setDrawer(!drawer)
+    else setNavCollapsed(!collapsed)
+  }
+
   return (
     <SettingsProvider>
       <CubeStoreProvider>
-        <div className="app">
+        <div className={`app ${collapsed ? 'app--nav-collapsed' : ''} ${drawer ? 'app--drawer' : ''}`}>
           <header className="app-header" ref={headerRef}>
-            <h1>Cubalyst</h1>
-            <nav>
-              {pages.map((p) => (
-                <NavLink key={p.path} to={p.path} end={p.end}>
-                  {p.label}
-                </NavLink>
-              ))}
-            </nav>
+            <button className="icon-button nav-toggle" onClick={toggleNav} title="メニュー" aria-label="メニュー">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+            <h1>
+              <Link to="/">Cubalyst</Link>
+            </h1>
             <div className="header-right">
               <CubeConnectionControl />
               <SystemMenu />
             </div>
           </header>
-          <CubeNotices />
-          <main>
+          <nav className="side-nav" aria-label="メニュー">
+            {NAV.map((n) => (
+              <NavLink
+                key={n.to}
+                to={n.to}
+                end={n.end}
+                title={n.label}
+                onClick={() => setDrawer(false)}
+                className={({ isActive }) => (isActive || n.match?.test(pathname) ? 'active' : '')}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  {n.icon}
+                </svg>
+                <span className="side-nav-label">{n.label}</span>
+              </NavLink>
+            ))}
+          </nav>
+          {drawer && <div className="nav-backdrop" onClick={() => setDrawer(false)} />}
+          <main className="app-main">
+            <CubeNotices />
             <Routes>
-              {pages.map((p) => (
-                <Route key={p.path} path={p.path} element={p.element ?? <Placeholder title={p.label} />} />
-              ))}
+              <Route path="/" element={<TimerPage />} />
+              <Route path="/practice" element={<PracticePage />} />
+              <Route path="/stats" element={<StatsPage />} />
+              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/analyses" element={<AnalysesPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route path="/history/:id" element={<SolveDetailPage />} />
               <Route path="/analyses/:id" element={<AnalysisDetailPage />} />
               <Route path="*" element={<Placeholder title="ページが見つかりません" />} />

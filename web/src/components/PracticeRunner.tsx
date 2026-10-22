@@ -5,6 +5,7 @@ import { useSaveSolve, useSessionState, useSolveSession } from '../solve/hooks'
 import { invert, splitAlg } from '../solve/notation'
 import type { ExerciseSource, SessionState } from '../solve/session'
 import { CubeView } from './CubeView'
+import { FitLayout } from './FitLayout'
 import { MockControls } from './MockControls'
 import { ScrambleDisplay } from './ScrambleDisplay'
 import { TimerDisplay } from './TimerDisplay'
@@ -46,25 +47,28 @@ export function PracticeRunner({
         : {}
 
   return (
-    <div className="practice-runner">
-      {session && state && (
+    <FitLayout
+      className="practice-runner"
+      main={
         <>
-          <ScrambleDisplay session={session} state={state} />
-          <TimerDisplay state={state} />
-          {overlay?.(state)}
+          {session && state && (
+            <>
+              <ScrambleDisplay session={session} state={state} />
+              <TimerDisplay state={state} />
+              {overlay?.(state)}
+            </>
+          )}
+          {status === 'disconnected' && <p className="muted center small">右上の「Connect」でキューブを接続すると練習できます</p>}
+          {error && <p className="error">{error}</p>}
         </>
-      )}
-      {status === 'disconnected' && <p className="muted center">右上の「Connect」でキューブを接続すると練習できます</p>}
-      {error && <p className="error">{error}</p>}
-      <div className="timer-grid">
-        <div>
-          <CubeView />
-        </div>
-        <div>
+      }
+      cube={<CubeView />}
+      side={
+        <>
           {side}
           <MockControls {...mock} />
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    />
   )
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { fetchHealth, type Health } from './api'
 import { Popover } from './ui/Popover'
 import { setDebug, useDebug } from './ui/prefs'
@@ -8,8 +9,8 @@ type State = { kind: 'loading' } | { kind: 'done'; health: Health } | { kind: 'f
 const POLL_MS = 30_000
 
 /**
- * ヘッダー右上のシステムメニュー。サーバー・DBの状態は異常なときだけ目立たせ、
- * 詳細とデバッグ表示の切り替えはメニューの中に置く。
+ * ヘッダー右上のメニュー。設定画面へのリンク、サーバー・DBの状態（異常なときだけヘッダーでも目立たせる）、
+ * デバッグ表示の切り替えを置く。
  */
 export function SystemMenu() {
   const [state, setState] = useState<State>({ kind: 'loading' })
@@ -46,11 +47,14 @@ export function SystemMenu() {
       )}
       <Popover
         trigger={<span className="system-icon">⚙</span>}
-        title="システムの状態・表示設定"
+        title="設定・システムの状態"
         buttonClassName="icon-button"
       >
-        {() => (
+        {(close) => (
           <div className="conn-detail">
+            <Link className="system-settings-link" to="/settings" onClick={close}>
+              設定を開く
+            </Link>
             <dl>
               <dt>サーバー</dt>
               <dd className={state.kind === 'failed' ? 'error' : ''}>

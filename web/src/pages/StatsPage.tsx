@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { listAnalyses, type Analysis, type SolveMode } from '../api'
 import { AnalysisHowTo } from '../components/AnalysisCard'
+import { AnalysisTabs } from '../components/AnalysisTabs'
 import { HistogramChart, TrendChart } from '../components/charts'
 import { formatDate, MODE_LABELS, multiTitle } from '../format'
 import { bests, histogram, stageStats, trend } from '../solve/aggregate'
@@ -78,6 +79,7 @@ export function StatsPage() {
 
   return (
     <div className="stats-page">
+      <AnalysisTabs />
       <section className="panel row">
         <label>
           モード{' '}

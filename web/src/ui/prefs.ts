@@ -34,3 +34,34 @@ export function useDebug(): boolean {
     () => debug,
   )
 }
+
+const NAV_KEY = 'cubalyst.navCollapsed'
+const navListeners = new Set<() => void>()
+let navCollapsed = (() => {
+  try {
+    return localStorage.getItem(NAV_KEY) === '1'
+  } catch {
+    return false
+  }
+})()
+
+export function setNavCollapsed(on: boolean) {
+  navCollapsed = on
+  try {
+    localStorage.setItem(NAV_KEY, on ? '1' : '0')
+  } catch {
+    // 保存できなくても表示は切り替える
+  }
+  navListeners.forEach((l) => l())
+}
+
+/** 左のメニューをアイコンだけに畳むか（広い画面のとき）。 */
+export function useNavCollapsed(): boolean {
+  return useSyncExternalStore(
+    (l) => {
+      navListeners.add(l)
+      return () => navListeners.delete(l)
+    },
+    () => navCollapsed,
+  )
+}
