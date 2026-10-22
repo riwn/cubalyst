@@ -155,10 +155,16 @@ export type CaseInfo = {
   alg: string
   /** ケースの状態（標準の向き）の54文字facelets。 */
   pattern: string
+  /** 手順練習で「覚えた」と印を付けたか。 */
+  learned: boolean
 }
 
 export function listCases(): Promise<CaseInfo[]> {
   return request('/api/cases')
+}
+
+export function setCaseLearned(id: string, learned: boolean): Promise<void> {
+  return request(`/api/cases/${id}/learned`, { method: 'PUT', body: JSON.stringify({ learned }) })
 }
 
 export type AnalysisKind = 'solve' | 'multi'

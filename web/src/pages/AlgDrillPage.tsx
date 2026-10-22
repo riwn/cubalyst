@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { createSolve, listCases, type CaseInfo } from '../api'
+import { createSolve, listCases, setCaseLearned, type CaseInfo } from '../api'
 import { algsFor } from '../cases/algs'
 import type { DrillAttempt } from '../cases/drill'
 import { useAlgDrill, useDrillState } from '../cases/hooks'
@@ -77,6 +77,14 @@ export function AlgDrillPage() {
   }, [])
 
   const selected = cases.find((c) => c.id === selectedId) ?? null
+  const toggleLearned = (c: CaseInfo) => {
+    const learned = !c.learned
+    setCases((prev) => prev.map((x) => (x.id === c.id ? { ...x, learned } : x)))
+    setCaseLearned(c.id, learned).catch((err: unknown) => {
+      setCases((prev) => prev.map((x) => (x.id === c.id ? { ...x, learned: !learned } : x)))
+      setError(`「覚えた」を保存できませんでした: ${String(err)}`)
+    })
+  }
   const alg = selected ? (chosenAlg[selected.id] ?? loadAlg(selected)) : ''
   const chooseAlg = (id: string, a: string) => {
     setChosenAlg((prev) => ({ ...prev, [id]: a }))
@@ -99,7 +107,10 @@ export function AlgDrillPage() {
             {s}
           </button>
         ))}
-        <span className="muted small">練習したいケースを1つ選んでください（手順が複数あるケースは回す手順も選べます）</span>
+        <span className="muted small">
+          覚えた {inTab.filter((c) => c.learned).length} / {inTab.length}
+        </span>
+        <span className="muted small">練習したいケースを1つ選んでください。覚えたケースに印を付けると、ステップ練習で覚えた手順だけを出せます</span>
       </section>
 
       {selected && (
@@ -107,7 +118,12 @@ export function AlgDrillPage() {
           <div className="row">
             <CaseDiagram c={selected} size={96} />
             <div className="drill-selected-info">
-              <strong>{selected.name}</strong>
+              <div className="row">
+                <strong>{selected.name}</strong>
+                <label className="small learned-toggle">
+                  <input type="checkbox" checked={selected.learned} onChange={() => toggleLearned(selected)} /> 覚えた
+                </label>
+              </div>
               {algsFor(selected).length > 1 ? (
                 <div className="drill-alg-choices" role="radiogroup" aria-label="回す手順">
                   {algsFor(selected).map((a, i) => (
@@ -141,7 +157,12 @@ export function AlgDrillPage() {
 
       {groups.map((g) => (
         <section key={g} className="case-group">
-          <h3>{g}</h3>
+          <h3>
+            {g}{' '}
+            <span className="muted small">
+              覚えた {inTab.filter((c) => c.group === g && c.learned).length} / {inTab.filter((c) => c.group === g).length}
+            </span>
+          </h3>
           <div className="case-grid">
             {inTab
               .filter((c) => c.group === g)
@@ -150,12 +171,15 @@ export function AlgDrillPage() {
                 return (
                   <button
                     key={c.id}
-                    className={`case-card ${selectedId === c.id ? 'selected' : 'selectable'}`}
+                    className={`case-card ${selectedId === c.id ? 'selected' : 'selectable'} ${c.learned ? 'learned' : ''}`}
                     onClick={() => setSelectedId(c.id)}
                     title={c.alg}
                   >
                     <CaseDiagram c={c} />
-                    <div className="case-name">{c.name}</div>
+                    <div className="case-name">
+                      {c.learned && <span className="learned-mark" aria-label="覚えた">✓</span>}
+                      {c.name}
+                    </div>
                     <div className="case-stat">{st ? `${formatTime(st.best, 2)}（${st.count}）` : '—'}</div>
                   </button>
                 )

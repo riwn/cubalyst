@@ -979,6 +979,20 @@ button.on-accent {
   font-weight: 600;
 }
 
+/* 覚えたケース：名前の前に ✓ */
+.learned-mark {
+  margin-right: 3px;
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.learned-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
 .case-stat {
   font-size: 0.75rem;
   color: var(--mute);

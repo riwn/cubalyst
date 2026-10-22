@@ -54,6 +54,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/export", s.handleExport)
 	mux.HandleFunc("POST /api/import", s.handleImport)
 	mux.HandleFunc("GET /api/cases", s.handleListCases)
+	mux.HandleFunc("PUT /api/cases/{id}/learned", s.handlePutCaseLearned)
 	mux.HandleFunc("GET /api/analyses", s.handleListAnalyses)
 	mux.HandleFunc("POST /api/analyses", s.handleSaveAnalysis)
 	mux.HandleFunc("GET /api/analyses/{id}", s.handleGetAnalysis)
