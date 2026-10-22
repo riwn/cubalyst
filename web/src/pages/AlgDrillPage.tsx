@@ -92,8 +92,9 @@ export function AlgDrillPage() {
         <span className="muted small">練習したいケースを1つ選んでください。覚えたケースに印を付けると、ステップ練習で覚えた手順だけを出せます</span>
       </section>
 
+      {!selected && <section className="panel drill-selected drill-selected--empty">ケースを選ぶと、ここに手順と「この手順を練習」が出ます</section>}
       {selected && (
-        <section className="panel drill-selected">
+        <section className="panel drill-selected" aria-live="polite">
           <div className="row">
             <CaseDiagram c={selected} size={96} />
             <div className="drill-selected-info">

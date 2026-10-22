@@ -68,6 +68,21 @@ body {
   align-items: center;
   gap: 8px 28px;
   padding: 14px 0;
+  /* スクロールしても上部に固定する */
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+/* 固定ヘッダーの背景。.app の外（画面の左右の端）まで広げて、下を流れる内容を隠す。
+   clip-path などで切るとヘッダーから下に開くメニューまで切れるので、疑似要素で敷く */
+.app-header::before {
+  content: '';
+  position: absolute;
+  inset: 0 -100vmax;
+  z-index: -1;
+  background: var(--mat);
+  border-bottom: 1px solid var(--line);
 }
 
 .app-header h1 {
@@ -1358,6 +1373,55 @@ button.danger-solid {
   opacity: 1;
 }
 
+/* 選んだケースの欄：一覧をスクロールしても固定ヘッダーのすぐ下に貼り付く。
+   未選択のときも同じ場所に案内を出しておき、選んだ瞬間に一覧がずれないようにする */
+.drill-selected {
+  position: sticky;
+  top: calc(var(--header-h, 64px) + 8px);
+  z-index: 10;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+.drill-selected--empty {
+  display: flex;
+  align-items: center;
+  min-height: 72px;
+  color: var(--mute);
+  box-shadow: none;
+}
+
+@media (max-width: 640px) {
+  .drill-selected svg {
+    width: 64px;
+    height: 64px;
+  }
+
+  /* 図と手順を横に並べ、練習ボタンは下の段に幅いっぱいで出す */
+  .drill-selected > .row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .drill-selected .drill-selected-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .drill-selected .spacer {
+    display: none;
+  }
+
+  .drill-selected button.primary {
+    flex-basis: 100%;
+  }
+
+  /* 手順の候補が多くても画面を占領しないように */
+  .drill-selected .drill-alg-choices {
+    max-height: 7.5em;
+    overflow-y: auto;
+  }
+}
+
 .drill-selected .drill-selected-info {
   display: flex;
   flex-direction: column;
@@ -1385,6 +1449,10 @@ button.danger-solid {
 
 .drill-alg-choice .alg {
   font-size: 1.05rem;
+}
+
+.drill-alg-choice .muted {
+  white-space: nowrap;
 }
 
 .drill-alg-choice.selected {
