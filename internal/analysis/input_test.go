@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"cubalyst/internal/settings"
-	"cubalyst/internal/solves"
+	"github.com/riwn/cubalyst/internal/settings"
+	"github.com/riwn/cubalyst/internal/solves"
 )
 
 func mv(moves string, step float64) []solves.Move {

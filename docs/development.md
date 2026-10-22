@@ -4,16 +4,10 @@ Cubalyst を動かす・手を入れるための詳しい情報です。使い�
 
 ## 必要なもの
 
-- Go 1.24 以上
+- Go 1.27 以上
 - Node.js 22 以上 / npm
 - GNU make と bash（`make dev` などで使います）
 - ブラウザ：Chrome または Edge（Web Bluetooth に対応しているもの）
-
-> `npm install` が `git@github.com: Permission denied (publickey)` で失敗する場合：依存の1つ（smartcube-web-bluetooth）を GitHub から取得しており、`package-lock.json` には SSH の URL で記録されています。GitHub に SSH 鍵を登録していないときは、次を実行してから入れ直すと https で取得します。
->
-> ```
-> git config --global url."https://github.com/".insteadOf ssh://git@github.com/
-> ```
 
 ## 起動のしかた
 

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"cubalyst/internal/notation"
-	"cubalyst/internal/solves"
+	"github.com/riwn/cubalyst/internal/notation"
+	"github.com/riwn/cubalyst/internal/solves"
 )
 
 // Version はJSON exportの形式バージョン。

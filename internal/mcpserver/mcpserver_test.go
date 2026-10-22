@@ -10,8 +10,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"cubalyst/internal/db"
-	"cubalyst/internal/server"
+	"github.com/riwn/cubalyst/internal/db"
+	"github.com/riwn/cubalyst/internal/server"
 )
 
 const solve = `{"mode":"full","solved_at":"2026-10-21T01:02:03.456Z","total_ms":3000,"penalty":"",

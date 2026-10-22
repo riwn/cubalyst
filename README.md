@@ -59,7 +59,7 @@ Cubalyst は記録を [MCP](https://modelcontextprotocol.io/) のツールとし
 
 ## はじめかた
 
-Go 1.24 以上、Node.js 22 以上、GNU make が必要です。
+Go 1.27 以上、Node.js 22 以上、GNU make が必要です。
 
 ```bash
 git clone https://github.com/riwn/cubalyst.git

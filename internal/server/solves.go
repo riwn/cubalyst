@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"cubalyst/internal/solves"
+	"github.com/riwn/cubalyst/internal/solves"
 )
 
 const defaultListLimit = 50

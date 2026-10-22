@@ -42,8 +42,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
-      # package-lock.json の GitHub 依存は git+ssh で記録されている。CI には鍵がないので https で取得する
-      - run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
