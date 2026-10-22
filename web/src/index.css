@@ -951,6 +951,39 @@ a:hover {
   font-weight: 400;
 }
 
+.history-table th[aria-sort] {
+  color: var(--ink);
+}
+
+/* 並べ替えできる見出し。押すと並べ替え、もう一度押すと逆順 */
+.history-table .sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+}
+
+.history-table .sort-button:hover {
+  color: var(--ink);
+}
+
+.history-table .sort-mark {
+  font-size: 0.7em;
+  opacity: 0.45;
+}
+
+.history-table .sort-button.sorted {
+  font-weight: 700;
+}
+
+.history-table .sort-button.sorted .sort-mark {
+  opacity: 1;
+}
+
 .history-table td,
 .splits-table td {
   font-family: var(--font-num);

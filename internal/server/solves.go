@@ -59,7 +59,8 @@ func (s *Server) handleListSolves(w http.ResponseWriter, r *http.Request) {
 //	from, to: RFC3339 または YYYY-MM-DD（to は排他的）
 //	ids: カンマ区切り
 //	limit: 既定50、0で無制限 / offset
-//	include=moves,splits,analyses: 回転ログ・段階・解析の数も返す / order=asc: 古い順
+//	include=moves,splits,analyses: 回転ログ・段階・解析の数も返す
+//	sort=date|time|moves|cross|f2l|oll|pll: 並べ替えの基準（既定は日時） / order=asc: 昇順（既定は降順）
 func parseFilter(q url.Values) (solves.Filter, error) {
 	f := solves.Filter{
 		Mode:            q.Get("mode"),
@@ -69,7 +70,11 @@ func parseFilter(q url.Values) (solves.Filter, error) {
 		IncludeMoves:    hasInclude(q, "moves"),
 		IncludeSplits:   hasInclude(q, "splits"),
 		IncludeAnalyses: hasInclude(q, "analyses"),
+		Sort:            q.Get("sort"),
 		Ascending:       q.Get("order") == "asc",
+	}
+	if _, ok := solves.SortKeys[f.Sort]; f.Sort != "" && !ok {
+		return f, fmt.Errorf("sort: unknown key %q", f.Sort)
 	}
 	var err error
 	if f.From, err = parseTimeParam(q.Get("from")); err != nil {

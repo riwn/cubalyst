@@ -290,8 +290,40 @@ type Filter struct {
 	IncludeSplits bool
 	// IncludeAnalyses が true の場合、Analyses（解析の数）も読み込む。
 	IncludeAnalyses bool
-	// Ascending が true なら古い順、false なら新しい順。
+	// Sort は並べ替えの基準（SortKeys のどれか）。空なら日時。
+	Sort string
+	// Ascending が true なら昇順（日時なら古い順）、false なら降順。
 	Ascending bool
+}
+
+// SortKeys は List の並べ替えの基準と、その値を出す SQL の式。値が NULL の行（DNF、段階の無いソルブなど）は、
+// 昇順・降順のどちらでも最後に並べる。同じ値どうしは新しい順。
+var SortKeys = map[string]string{
+	"date":  "solved_at",
+	"time":  "CASE penalty WHEN 'DNF' THEN NULL WHEN '+2' THEN total_ms + 2000 ELSE total_ms END",
+	"moves": "(SELECT SUM(move_count) FROM solve_splits WHERE solve_id = solves.id)",
+	"cross": splitSum("'cross'"),
+	"f2l":   splitSum("'f2l1', 'f2l2', 'f2l3', 'f2l4'"),
+	"oll":   splitSum("'oll'"),
+	"pll":   splitSum("'pll'"),
+}
+
+// splitSum は、指定した段階にかかった時間の合計を出す SQL の式。
+func splitSum(stages string) string {
+	return "(SELECT SUM(end_ms - start_ms) FROM solve_splits WHERE solve_id = solves.id AND stage IN (" + stages + "))"
+}
+
+// orderBy は List の ORDER BY 句。
+func (f Filter) orderBy() string {
+	dir := "DESC"
+	if f.Ascending {
+		dir = "ASC"
+	}
+	expr, ok := SortKeys[f.Sort]
+	if !ok || f.Sort == "date" {
+		return " ORDER BY solved_at " + dir + ", id " + dir
+	}
+	return " ORDER BY (" + expr + ") IS NULL, " + expr + " " + dir + ", solved_at DESC, id DESC"
 }
 
 func (f Filter) where() (string, []any) {
@@ -340,12 +372,8 @@ func (st *Store) List(ctx context.Context, f Filter) ([]Solve, int, error) {
 	if f.IncludeMoves {
 		movesCol = "moves"
 	}
-	order := "DESC"
-	if f.Ascending {
-		order = "ASC"
-	}
 	q := `SELECT id, mode, solved_at, total_ms, penalty, scramble, ` + movesCol + `, case_id, step, note
-		FROM solves` + where + ` ORDER BY solved_at ` + order + `, id ` + order
+		FROM solves` + where + f.orderBy()
 	if f.Limit > 0 {
 		q += fmt.Sprintf(" LIMIT %d OFFSET %d", f.Limit, f.Offset)
 	}

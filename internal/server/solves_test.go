@@ -68,6 +68,12 @@ func TestSolvesAPI(t *testing.T) {
 	if rec := do(t, h, http.MethodGet, "/api/solves?limit=-1", ""); rec.Code != http.StatusBadRequest {
 		t.Fatalf("bad limit: %d", rec.Code)
 	}
+	if rec := do(t, h, http.MethodGet, "/api/solves?sort=bogus", ""); rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad sort: %d", rec.Code)
+	}
+	if rec := do(t, h, http.MethodGet, "/api/solves?sort=time&order=asc", ""); rec.Code != http.StatusOK {
+		t.Fatalf("sort by time: %d %s", rec.Code, rec.Body)
+	}
 	if rec := do(t, h, http.MethodGet, "/api/solves?from=2026-10-22", ""); !strings.Contains(rec.Body.String(), `"total":0`) {
 		t.Fatalf("from filter: %s", rec.Body)
 	}

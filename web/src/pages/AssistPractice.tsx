@@ -262,7 +262,7 @@ function CaseHint({
         <span className="muted">考え中…</span>
       ) : (
         <>
-          {info && <CaseDiagram c={info} size={56} />}
+          {info && <CaseDiagram c={info} size={56} arrows />}
           <div>
             <div>
               <strong>{c.name}</strong>
