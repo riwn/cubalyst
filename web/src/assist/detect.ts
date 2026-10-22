@@ -140,3 +140,39 @@ export function assistFor(kpuzzle: KPuzzle, view: KPattern, algFor: (c: CaseDef)
   }
   return { stage: 'pll', case: null, pre: '', alg: '', post: '' }
 }
+
+/** 段階（0：Cross 前 … 4：F2L 3ペア、5：F2L 完成、6：OLL 完成、7：完成）。 */
+export const stageOf = (view: KPattern) => level(view)
+
+/**
+ * 画面に出し続ける補助。手順を回している途中は F2L やクロスが一時的に崩れて段階が下がるので、
+ * 一度進んだ段階より下がったあいだは、前の表示（ケースと手順）を保つ。
+ */
+export type StickyAssist = {
+  /** 表示している補助を判定したときの段階。 */
+  level: number
+  assist: Assist
+  /** 段階が下がってから回した手数（0 なら下がっていない）。 */
+  frozen: number
+}
+
+/** 段階が下がったまま、これだけ回したら（手順をやめて崩した場合など）、今の状態で判定し直す。 */
+export const MAX_FROZEN_MOVES = 40
+
+/**
+ * 1手ごとに呼び、表示する補助を返す。prev は前の手での戻り値（ソルブの始めは null）。
+ * 段階が上がった・同じ段階のまま（U で合わせるなど）なら判定し直し、下がったら前の表示を保つ。
+ * いったん下がったあとは、段階が前より上がるまで（＝手順を回し終えるまで）保つ。
+ */
+export function stickyAssist(
+  prev: StickyAssist | null,
+  kpuzzle: KPuzzle,
+  view: KPattern,
+  algFor: (c: CaseDef) => string = (c) => c.alg,
+): StickyAssist {
+  const lv = level(view)
+  const fresh = () => ({ level: lv, assist: assistFor(kpuzzle, view, algFor), frozen: 0 })
+  if (!prev || lv > prev.level || prev.frozen + 1 > MAX_FROZEN_MOVES) return fresh()
+  if (lv === prev.level && prev.frozen === 0) return fresh()
+  return { ...prev, frozen: prev.frozen + 1 }
+}

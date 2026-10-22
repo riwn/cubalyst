@@ -6,7 +6,7 @@ import { applyNormalized, invertRotation } from '../cases/geometry'
 import { patternToFacelets } from '../cube/facelets'
 import { holdRotation } from '../cube/orientation'
 import { stageLevel } from '../solve/cfop'
-import { afterRotation, assistFor, viewFrom } from './detect'
+import { afterRotation, assistFor, MAX_FROZEN_MOVES, stickyAssist, viewFrom, type StickyAssist } from './detect'
 
 const kpuzzle = await cube3x3x3.kpuzzle()
 const solved = kpuzzle.defaultPattern()
@@ -106,5 +106,59 @@ describe('assistFor', () => {
   it('reports cross and solved', () => {
     expect(assistFor(kpuzzle, solved).stage).toBe('solved')
     expect(assistFor(kpuzzle, applyNormalized(kpuzzle, 'D R2 F')).stage).toBe('cross')
+  })
+})
+
+describe('stickyAssist', () => {
+  /** 手順を90度ずつの手に分ける（R2 → R R）。 */
+  const quarters = (alg: string) =>
+    alg
+      .trim()
+      .split(/\s+/)
+      .flatMap((m) => (m.endsWith('2') ? [m[0], m[0]] : [m]))
+
+  it('keeps the OLL hint while the algorithm breaks F2L, then moves on to PLL', () => {
+    const oll = OLL_CASES.find((c) => c.id === 'oll-33')!
+    const tperm = "R U R' U' R' F R2 U' R' U' R U R' F'"
+    // T パームのあと OLL 33 の逆：OLL を回すと PLL（T パーム）が残る
+    let view = applyNormalized(kpuzzle, `${tperm} ${inv(oll.alg)}`)
+    let s: StickyAssist | null = stickyAssist(null, kpuzzle, view)
+    expect(s.assist.stage === 'oll' && s.assist.case?.id).toBe('oll-33')
+
+    const moves = quarters(oll.alg)
+    let dropped = false
+    moves.forEach((m, i) => {
+      view = view.applyAlg(m)
+      s = stickyAssist(s, kpuzzle, view)
+      if (i < moves.length - 1) {
+        // 回している途中は、段階が下がっても OLL 33 のまま
+        if (s.frozen > 0) dropped = true
+        expect(s.assist.stage === 'oll' && s.assist.case?.id).toBe('oll-33')
+      }
+    })
+    expect(dropped).toBe(true)
+    // 回し終えると PLL に進む
+    expect(s!.assist.stage === 'pll' && s!.assist.case?.id).toBe('pll-T')
+  })
+
+  it('updates within the same stage when nothing was broken (adjusting with U)', () => {
+    const oll = OLL_CASES.find((c) => c.id === 'oll-45')!
+    let view = applyNormalized(kpuzzle, inv(oll.alg))
+    let s = stickyAssist(null, kpuzzle, view)
+    const pre = s.assist.stage === 'oll' ? s.assist.pre : null
+    view = view.applyAlg('U')
+    s = stickyAssist(s, kpuzzle, view)
+    expect(s.frozen).toBe(0)
+    expect(s.assist.stage === 'oll' && s.assist.pre).not.toBe(pre)
+  })
+
+  it('gives up keeping the hint after many moves without progress', () => {
+    const view = applyNormalized(kpuzzle, "R U R' U' F")
+    let s: StickyAssist = { level: 6, assist: { stage: 'pll', case: null, pre: '', alg: '', post: '' }, frozen: 0 }
+    s = stickyAssist(s, kpuzzle, view)
+    expect(s.frozen).toBe(1)
+    for (let i = 0; i < MAX_FROZEN_MOVES; i++) s = stickyAssist(s, kpuzzle, view)
+    expect(s.frozen).toBe(0)
+    expect(s.assist.stage).not.toBe('pll')
   })
 })
