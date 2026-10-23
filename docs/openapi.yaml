@@ -1,0 +1,571 @@
+openapi: 3.1.0
+info:
+  title: Cubalyst API
+  version: "1"
+  description: |
+    スマートキューブで記録したソルブ（3x3、CFOP）を保存・集計・解析する API。画面（web/）と MCP サーバー（`cubalyst mcp`）が使う。
+
+    - 認証は無い。信頼できるネットワークの中だけで使う前提
+    - ブラウザから別のオリジンで書き込み系（GET・HEAD・OPTIONS 以外）を呼ぶと 403（`Sec-Fetch-Site`・`Origin` を見る）。curl や MCP サーバーからは通る
+    - 時間はミリ秒（`*_ms`）。日時は RFC 3339
+    - エラーは `{"error": "..."}`
+
+    この仕様書は `docs/openapi.yaml`。サーバーは `GET /api/openapi.yaml` でも返す。ルートを足したら、ここにも足す（`internal/server` のテストがずれを見つける）。
+# 認証は無い
+security: []
+servers:
+  - url: /
+    description: このアプリを動かしているサーバー
+  - url: http://127.0.0.1:8080
+    description: 開発（make dev）
+tags:
+  - name: ソルブ
+  - name: 解析
+    description: AI による解析の入力データと、保存した解析結果
+  - name: ケース
+    description: OLL・PLL などのケースと、覚えたかどうか
+  - name: 設定
+  - name: 入出力
+  - name: その他
+
+paths:
+  /api/health:
+    get:
+      tags: [その他]
+      summary: 動いているか
+      operationId: health
+      responses:
+        "200":
+          description: DB につながっている
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: DB につながらない
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  /api/openapi.yaml:
+    get:
+      tags: [その他]
+      summary: この仕様書
+      operationId: openapi
+      responses:
+        "200":
+          description: OpenAPI（YAML）
+          content:
+            application/yaml:
+              schema: { type: string }
+
+  /api/solves:
+    get:
+      tags: [ソルブ]
+      summary: ソルブの一覧
+      operationId: listSolves
+      parameters:
+        - $ref: "#/components/parameters/mode"
+        - { name: case_id, in: query, description: ケースの ID（完全一致）, schema: { type: string } }
+        - { name: step, in: query, description: 段階の練習の段階（完全一致）, schema: { type: string } }
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/ids"
+        - { name: limit, in: query, description: 件数。0 で無制限, schema: { type: integer, minimum: 0, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - name: include
+          in: query
+          description: 一緒に返すもの（カンマ区切り）。moves＝回転ログ、splits＝段階、analyses＝解析の数
+          schema: { type: string, example: "splits,analyses" }
+        - name: sort
+          in: query
+          description: 並べ替えの基準。値の無いもの（DNF など）は最後
+          schema: { type: string, enum: [date, time, moves, cross, f2l, oll, pll], default: date }
+        - { name: order, in: query, description: asc で昇順（既定は降順）, schema: { type: string, enum: [asc, desc] } }
+      responses:
+        "200":
+          description: 一覧と、条件に合う全体の件数
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [solves, total]
+                properties:
+                  solves: { type: array, items: { $ref: "#/components/schemas/Solve" } }
+                  total: { type: integer }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    post:
+      tags: [ソルブ]
+      summary: ソルブを記録する
+      operationId: createSolve
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Solve" }
+      responses:
+        "201":
+          description: 記録したソルブ（id が付く）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Solve" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/solves/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [ソルブ]
+      summary: ソルブを1件（回転ログ・段階つき）
+      operationId: getSolve
+      responses:
+        "200":
+          description: ソルブ
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Solve" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [ソルブ]
+      summary: ペナルティ・メモを直す
+      operationId: updateSolve
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              description: 送った項目だけ変える
+              properties:
+                penalty: { $ref: "#/components/schemas/Penalty" }
+                note: { type: string }
+      responses:
+        "200":
+          description: 直したソルブ
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Solve" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [ソルブ]
+      summary: ソルブを消す
+      operationId: deleteSolve
+      responses:
+        "204": { description: 消した }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/solves/{id}/splits:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    put:
+      tags: [ソルブ]
+      summary: 段階の区切りを置き換える
+      operationId: replaceSplits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: array, items: { $ref: "#/components/schemas/Split" } }
+      responses:
+        "200":
+          description: 置き換えたあとのソルブ
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Solve" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/solves/{id}/analysis-input:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [解析]
+      summary: 1回のソルブを解析するための入力データ
+      operationId: solveAnalysisInput
+      responses:
+        "200":
+          description: 入力データと、解析の観点（system・request）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnalysisInput" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/analysis-input:
+    get:
+      tags: [解析]
+      summary: 複数のソルブをまとめて解析するための入力データ
+      description: ids を指定したらそれだけ、無ければ mode・期間・件数で選ぶ
+      operationId: multiAnalysisInput
+      parameters:
+        - $ref: "#/components/parameters/ids"
+        - $ref: "#/components/parameters/mode"
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - { name: limit, in: query, description: 新しい方から何件, schema: { type: integer, minimum: 0 } }
+        - { name: title, in: query, description: まとめの題, schema: { type: string } }
+      responses:
+        "200":
+          description: 入力データと、対象にしたソルブの ID
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnalysisInput" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/analyses:
+    get:
+      tags: [解析]
+      summary: 保存した解析の一覧（新しい順）
+      operationId: listAnalyses
+      parameters:
+        - { name: kind, in: query, schema: { type: string, enum: [solve, multi] } }
+        - { name: solve_id, in: query, description: このソルブを対象にした解析だけ（単体・まとめとも）, schema: { type: integer, minimum: 1 } }
+        - { name: limit, in: query, description: 0 で無制限, schema: { type: integer, minimum: 0, default: 20 } }
+      responses:
+        "200":
+          description: 解析
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Analysis" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    post:
+      tags: [解析]
+      summary: 解析結果を保存する
+      description: 入力データは、対象のソルブから作り直して一緒に保存する
+      operationId: saveAnalysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveAnalysisRequest" }
+      responses:
+        "201":
+          description: 保存した解析
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Analysis" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/analyses/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [解析]
+      summary: 解析を1件
+      operationId: getAnalysis
+      responses:
+        "200":
+          description: 解析
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Analysis" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [解析]
+      summary: 解析を消す
+      operationId: deleteAnalysis
+      responses:
+        "204": { description: 消した }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/cases:
+    get:
+      tags: [ケース]
+      summary: ケースの一覧
+      operationId: listCases
+      parameters:
+        - { name: set, in: query, description: ケースの組（例：oll、pll）, schema: { type: string } }
+      responses:
+        "200":
+          description: ケース（決まった順）
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Case" } }
+
+  /api/cases/{id}/learned:
+    parameters:
+      - { name: id, in: path, required: true, description: ケースの ID, schema: { type: string } }
+    put:
+      tags: [ケース]
+      summary: 覚えたかどうかを記録する
+      operationId: putCaseLearned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [learned]
+              additionalProperties: false
+              properties:
+                learned: { type: boolean }
+      responses:
+        "200":
+          description: 記録した
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  learned: { type: boolean }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/settings:
+    get:
+      tags: [設定]
+      summary: 設定
+      operationId: getSettings
+      responses:
+        "200":
+          description: 設定
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Settings" }
+    put:
+      tags: [設定]
+      summary: 設定を変える
+      description: 送らなかった項目は初期値になる
+      operationId: putSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Settings" }
+      responses:
+        "200":
+          description: 変えたあとの設定
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Settings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/export:
+    get:
+      tags: [入出力]
+      summary: ソルブを書き出す（ファイルとして）
+      description: 一覧と同じ条件で絞り込める。limit を省くと全件、order を省くと古い順。回転ログと段階も含む
+      operationId: exportSolves
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [json, csv, txt], default: json } }
+        - $ref: "#/components/parameters/mode"
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - $ref: "#/components/parameters/ids"
+        - { name: limit, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: order, in: query, schema: { type: string, enum: [asc, desc] } }
+      responses:
+        "200":
+          description: "書き出したファイル（Content-Disposition: attachment）"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExportDocument" }
+            text/csv:
+              schema: { type: string }
+            text/plain:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/import:
+    post:
+      tags: [入出力]
+      summary: 書き出した JSON を読み込む
+      description: 同じソルブ（重複）は飛ばす
+      operationId: importSolves
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExportDocument" }
+      responses:
+        "200":
+          description: 読み込んだ件数
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [imported, skipped, errors]
+                properties:
+                  imported: { type: integer }
+                  skipped: { type: integer, description: 重複で飛ばした件数 }
+                  errors: { type: array, items: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+components:
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    mode:
+      name: mode
+      in: query
+      schema: { $ref: "#/components/schemas/Mode" }
+    from:
+      name: from
+      in: query
+      description: この日時から（RFC 3339 か YYYY-MM-DD）
+      schema: { type: string, example: "2026-10-01" }
+    to:
+      name: to
+      in: query
+      description: この日時の前まで（含まない。RFC 3339 か YYYY-MM-DD）
+      schema: { type: string }
+    ids:
+      name: ids
+      in: query
+      description: ソルブの ID（カンマ区切り）
+      schema: { type: string, example: "12,15,18" }
+
+  responses:
+    BadRequest:
+      description: 値が正しくない
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: 見つからない
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, error] }
+        schema_version: { type: integer }
+        error: { type: string }
+
+    Mode:
+      type: string
+      description: full＝フルソルブ、case＝ケースの練習、step＝段階の練習、assist＝補助付きの練習（タイマーの記録とは分ける）
+      enum: [full, case, step, assist]
+
+    Penalty:
+      type: string
+      description: 空文字はペナルティなし
+      enum: ["", "+2", DNF]
+
+    Solve:
+      type: object
+      required: [mode, solved_at, total_ms]
+      properties:
+        id: { type: integer, format: int64, readOnly: true }
+        mode: { $ref: "#/components/schemas/Mode" }
+        solved_at: { type: string, format: date-time }
+        total_ms: { type: integer, minimum: 0 }
+        penalty: { $ref: "#/components/schemas/Penalty" }
+        scramble: { type: string, description: WCA の向き（白上・緑前） }
+        moves:
+          type: array
+          description: 回転ログ（一覧では include=moves のときだけ）
+          items: { $ref: "#/components/schemas/Move" }
+        case_id: { type: [string, "null"], description: mode=case のとき必須 }
+        step: { type: [string, "null"] }
+        note: { type: string }
+        splits:
+          type: array
+          description: CFOP の段階（一覧では include=splits のときだけ）
+          items: { $ref: "#/components/schemas/Split" }
+        analyses:
+          type: object
+          readOnly: true
+          description: このソルブを対象にした解析の数（一覧で include=analyses のときだけ）
+          properties:
+            solve: { type: integer }
+            multi: { type: integer }
+
+    Move:
+      type: object
+      description: 回転ログの1手（90 度回転。R2 は R R）
+      properties:
+        move: { type: string, example: "R'" }
+        cube_ts: { type: [number, "null"], description: キューブ側のタイムスタンプ }
+        local_ts: { type: [number, "null"], description: PC 側のタイムスタンプ }
+        t: { type: number, description: 補正後の、ソルブ開始からの相対ミリ秒 }
+
+    Split:
+      type: object
+      description: CFOP の1段階
+      properties:
+        stage: { type: string, enum: [cross, f2l1, f2l2, f2l3, f2l4, oll, pll] }
+        start_ms: { type: integer }
+        end_ms: { type: integer }
+        move_count: { type: integer }
+        start_index: { type: integer, description: "回転ログ上の範囲 [start_index, end_index)" }
+        end_index: { type: integer }
+
+    Settings:
+      type: object
+      additionalProperties: false
+      properties:
+        cross_color: { type: string, enum: [white, yellow, green, blue, red, orange], default: white }
+        hold_bottom: { type: string, description: 解くときの持ち方（下の色）, default: white }
+        hold_front: { type: string, description: 解くときの持ち方（前の色）, default: green }
+        inspection: { type: boolean, description: フルソルブで 15 秒のインスペクションを使うか, default: true }
+
+    Case:
+      type: object
+      properties:
+        id: { type: string }
+        set: { type: string, description: ケースの組（oll、pll など） }
+        name: { type: string }
+        group: { type: string }
+        alg: { type: string, description: 手順 }
+        pattern: { type: string }
+        learned: { type: boolean }
+
+    AnalysisInput:
+      type: object
+      description: AI に渡す入力データ。system と request は解析の観点・出力の形式
+      properties:
+        input: { type: string }
+        system: { type: string }
+        request: { type: string }
+        solve_ids: { type: array, items: { type: integer, format: int64 } }
+        title: { type: string }
+
+    SaveAnalysisRequest:
+      type: object
+      required: [kind, result]
+      additionalProperties: false
+      properties:
+        kind: { type: string, enum: [solve, multi] }
+        solve_id: { type: integer, format: int64, description: kind=solve のとき }
+        solve_ids: { type: array, items: { type: integer, format: int64 }, description: kind=multi のとき（2 件以上） }
+        title: { type: string, description: まとめの題 }
+        params: { description: 対象の選び方（表示用、任意） }
+        result: { type: string, description: 解析結果（Markdown） }
+        model: { type: string, description: 解析したモデル。空なら外部のモデル }
+
+    Analysis:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        kind: { type: string, enum: [solve, multi] }
+        title: { type: string }
+        params: { description: 対象の選び方（保存したときのまま） }
+        solve_ids: { type: array, description: 対象のソルブ（古い順。消したソルブは含まない）, items: { type: integer, format: int64 } }
+        input: { type: string }
+        result: { type: string, description: Markdown }
+        model: { type: string }
+        created_at: { type: string, format: date-time }
+
+    ExportDocument:
+      type: object
+      required: [version, solves]
+      properties:
+        version: { type: integer, description: 書き出しの形式の版 }
+        exported_at: { type: string, format: date-time }
+        solves: { type: array, items: { $ref: "#/components/schemas/Solve" } }

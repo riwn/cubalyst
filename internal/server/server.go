@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/riwn/cubalyst/docs"
 	"github.com/riwn/cubalyst/internal/analysis"
 	"github.com/riwn/cubalyst/internal/db"
 	"github.com/riwn/cubalyst/internal/settings"
@@ -43,6 +44,7 @@ func New(database *sql.DB, staticDir string) *Server {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.handleHealth)
+	mux.HandleFunc("GET /api/openapi.yaml", handleOpenAPI)
 	mux.HandleFunc("POST /api/solves", s.handleCreateSolve)
 	mux.HandleFunc("GET /api/solves", s.handleListSolves)
 	mux.HandleFunc("GET /api/solves/{id}", s.handleGetSolve)
@@ -91,6 +93,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, healthResponse{Status: "ok", DB: "ok", SchemaVersion: v})
+}
+
+// handleOpenAPI は API の仕様書（docs/openapi.yaml）を返す。
+func handleOpenAPI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/yaml; charset=utf-8")
+	w.Write(docs.OpenAPI)
 }
 
 // staticHandler はstaticDir配下のファイルを返し、存在しないパスはSPAとしてindex.htmlにフォールバックする。
