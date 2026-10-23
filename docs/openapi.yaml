@@ -26,6 +26,8 @@ tags:
     description: OLL・PLL などのケースと、覚えたかどうか
   - name: 設定
   - name: 入出力
+  - name: 通知
+    description: 決まった時刻に Discord へ送る側（hatodokei の「外部から取得」のジョブなど）が呼ぶ。同じマシンからリバースプロキシを通さずに呼ぶ
   - name: その他
 
 paths:
@@ -393,6 +395,43 @@ paths:
                   errors: { type: array, items: { type: string } }
         "400": { $ref: "#/components/responses/BadRequest" }
 
+  /api/notify/summary:
+    get:
+      tags: [通知]
+      summary: 練習のまとめ（Discord に送る本文）
+      description: |
+        期間のソルブから、Discord の Webhook の形の本文（`{"message": {...}}`）を作る。hatodokei の「外部から取得」のジョブにそのまま渡せる。
+
+        - フルソルブ：回数・ベスト・平均・ao5 と ao12 のベスト、前の期間との平均の比較、段階ごと（Cross・F2L・OLL・PLL）の平均・手数・TPS
+        - 自己ベスト（単発・ao5）を更新したら、説明の先頭に書き、色を金にする
+        - 1週間なら、練習した日ごとの回数とベスト
+        - ケース練習（多いケース）・段階練習・補助付きの回数
+
+        練習が1回も無ければ 204（送らない）。リバースプロキシを通った要求（`X-Forwarded-For` が付く）は 403
+      operationId: notifySummary
+      parameters:
+        - name: period
+          in: query
+          description: week＝date までの7日、day＝date の1日
+          schema: { type: string, enum: [week, day], default: week }
+        - name: date
+          in: query
+          description: 期間の最後の日（YYYY-MM-DD か yesterday）。省くと今日。月曜の朝に先週の分を送るなら yesterday
+          schema: { type: string, example: yesterday }
+      responses:
+        "200":
+          description: Discord に送る本文
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotifyPayload" }
+        "204": { description: 期間に練習が無い（送らない） }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403":
+          description: リバースプロキシを通った要求
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
 components:
   parameters:
     id:
@@ -561,6 +600,31 @@ components:
         result: { type: string, description: Markdown }
         model: { type: string }
         created_at: { type: string, format: date-time }
+
+    NotifyPayload:
+      type: object
+      description: Discord の Webhook に送る本文
+      properties:
+        message:
+          type: object
+          properties:
+            embeds:
+              type: array
+              items:
+                type: object
+                properties:
+                  title: { type: string, example: "🧊 1週間の練習　10/17〜10/23" }
+                  description: { type: string }
+                  timestamp: { type: string, format: date-time }
+                  color: { type: integer }
+                  fields:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        value: { type: string }
+                        inline: { type: boolean }
 
     ExportDocument:
       type: object
