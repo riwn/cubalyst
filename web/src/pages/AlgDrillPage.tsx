@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createSolve, listCases, setCaseLearned, type CaseInfo } from '../api'
 import { algsFor, preferredAlg, savePreferredAlg } from '../cases/algs'
 import type { DrillAttempt } from '../cases/drill'
-import { useAlgDrill, useDrillState } from '../cases/hooks'
+import { useAlgDrill, useCaseSetup, useCaseSetupState, useDrillState } from '../cases/hooks'
+import type { CaseSetup, CaseSetupState } from '../cases/setup'
 import { scrambleBetween } from '../cases/exercise'
 import { invertRotation, normalizeOrientation } from '../cases/geometry'
 import { caseStats } from '../cases/stats'
 import { CaseDiagram } from '../components/CaseDiagram'
 import { FitLayout } from '../components/FitLayout'
+import { MockControls } from '../components/MockControls'
 import { CubeView } from '../components/CubeView'
 import { useCubeState, useCubeStore } from '../cube/hooks'
 import { MockConnection, parseMoveLog } from '../cube/mock'
@@ -15,6 +17,7 @@ import { holdRotation } from '../cube/orientation'
 import { useHoldFrame, useSettings } from '../settings/hooks'
 import { useSolveList } from '../solve/hooks'
 import { averageOf, best, effectiveTime, formatTime } from '../solve/stats'
+import { KebabMenu } from '../ui/Popover'
 import { useDebug } from '../ui/prefs'
 
 const SETS = ['OLL', 'PLL', 'F2L'] as const
@@ -189,6 +192,16 @@ function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBa
     [store.kpuzzle, settings.hold_bottom, settings.hold_front],
   )
   const drill = useAlgDrill(store, alg, rotation)
+  // 「この形にする」の間は、手順を回したかの判定を記録しない（形を作る手で誤って数えないため）
+  const [settingUp, setSettingUp] = useState(false)
+  const setup = useCaseSetup(store, alg, rotation, settingUp)
+  const setupState = useCaseSetupState(setup)
+  useEffect(() => {
+    if (setupState?.phase !== 'done') return
+    drill?.reset()
+    // eslint-disable-next-line react/set-state-in-effect
+    setSettingUp(false)
+  }, [setupState, drill])
   const frame = useHoldFrame()
   const hold = useMemo(() => ({ rotation, frame }), [rotation, frame])
 
@@ -217,12 +230,12 @@ function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBa
   )
 
   useEffect(() => {
-    if (!drill) return
+    if (!drill || settingUp) return
     return drill.events.subscribe((e) => {
       setAttempts((prev) => [e.attempt.ms, ...prev])
       void save(e.attempt)
     })
-  }, [drill, save])
+  }, [drill, save, settingUp])
 
   const state = useDrillState(drill)
 
@@ -271,7 +284,7 @@ function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBa
               />{' '}
               秒
             </label>
-            <button onClick={() => drill?.reset()} title="回しかけを捨てて、今の状態から数え直す">
+            <button onClick={() => drill?.reset()} disabled={settingUp} title="回しかけを捨てて、今の状態から数え直す">
               数え直す
             </button>
           </div>
@@ -285,24 +298,35 @@ function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBa
                 揃っていなくても大丈夫です。手順を回し終えるたびに自動で記録します（前後のAUF・別の面での実行もOK）。
               </div>
             </div>
+            {settingUp ? (
+              <button onClick={() => setSettingUp(false)}>やめる</button>
+            ) : (
+              <button onClick={() => setSettingUp(true)} title="今の状態から、この手順で揃う形へ持っていく手順を出す">
+                この形にする
+              </button>
+            )}
           </section>
 
           {status === 'disconnected' && <p className="muted center small">右上の「Connect」でキューブを接続すると練習できます</p>}
 
-          <section className={`timer ${moving ? 'timer--running' : last != null && last <= targetMs ? 'drill--good' : ''}`}>
-            <div className="timer-time">
-              {moving ? formatTime(Math.max(0, now - state.startedAt!), 2) : last != null ? formatTime(last, 3) : '0.000'}
-            </div>
-            <div className="timer-hint">
-              {moving
-                ? `${state.moveCount}手`
-                : last != null
-                  ? last <= targetMs
-                    ? `目標（${target}秒）以内！`
-                    : `目標まで ${((last - targetMs) / 1000).toFixed(2)}秒`
-                  : '手順を回すと計測します'}
-            </div>
-          </section>
+          {settingUp && setup && setupState ? (
+            <SetupPanel setup={setup} state={setupState} />
+          ) : (
+            <section className={`timer ${moving ? 'timer--running' : last != null && last <= targetMs ? 'drill--good' : ''}`}>
+              <div className="timer-time">
+                {moving ? formatTime(Math.max(0, now - state.startedAt!), 2) : last != null ? formatTime(last, 3) : '0.000'}
+              </div>
+              <div className="timer-hint">
+                {moving
+                  ? `${state.moveCount}手`
+                  : last != null
+                    ? last <= targetMs
+                      ? `目標（${target}秒）以内！`
+                      : `目標まで ${((last - targetMs) / 1000).toFixed(2)}秒`
+                    : '手順を回すと計測します'}
+              </div>
+            </section>
+          )}
         </>
       }
       cube={<CubeView hold={hold} />}
@@ -346,10 +370,60 @@ function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBa
             )}
           </section>
           {saveError && <p className="error">{saveError}</p>}
-          {debug && connection instanceof MockConnection && <MockDrillButton mock={connection} alg={alg} rotation={rotation} />}
+          {debug && setupState?.phase === 'scrambling' && <MockControls scramble={remainingMoves(setupState)} />}
+          {debug && !settingUp && connection instanceof MockConnection && <MockDrillButton mock={connection} alg={alg} rotation={rotation} />}
         </>
       }
     />
+  )
+}
+
+/** 形を作る手順のうち、まだ回していない手（間違えたときは戻す手から）。 */
+function remainingMoves(state: Extract<CaseSetupState, { phase: 'scrambling' }>): string[] {
+  const p = state.progress
+  return [
+    ...p.correction,
+    ...(p.halfRemaining ? [p.halfRemaining, ...p.moves.slice(p.done + 1)] : p.moves.slice(p.done)),
+  ]
+}
+
+/** 「この形にする」の手順と進み具合。揃ったら自動で閉じて、そこから計測する。 */
+function SetupPanel({ setup, state }: { setup: CaseSetup; state: CaseSetupState }) {
+  return (
+    <section className="scramble">
+      <div className="exercise-label">この手順で揃う形にする</div>
+      {state.phase === 'generating' && <p className="muted">手順を作っています…</p>}
+      {state.phase === 'error' && <p className="error">{state.error}</p>}
+      {state.phase === 'scrambling' && (
+        <>
+          <p className="scramble-moves">
+            {state.progress.moves.map((m, i) => {
+              const p = state.progress
+              const cls = i < p.done ? 'done' : i === p.done && p.correction.length === 0 ? (p.half ? 'current half' : 'current') : ''
+              return (
+                <span key={i} className={`scramble-move ${cls}`}>
+                  {m}
+                </span>
+              )
+            })}
+          </p>
+          <div className="correction-slot" aria-live="polite">
+            {state.progress.correction.length > 0 && (
+              <p className="correction">
+                戻す: <strong>{state.progress.correction.join(' ')}</strong>
+              </p>
+            )}
+          </div>
+          <div className="row scramble-actions">
+            <span className="muted small">白を上・緑を前にして回してください。回し終えると、そこから計測します</span>
+            <KebabMenu
+              align="left"
+              items={[{ label: '形ができたことにする（追跡がうまくいかないとき）', onSelect: () => setup.forceDone() }]}
+            />
+          </div>
+        </>
+      )}
+    </section>
   )
 }
 

@@ -1768,6 +1768,10 @@ button.danger-solid {
   align-items: center;
   gap: 16px;
 }
+.drill-head > button {
+  margin-left: auto;
+  flex: none;
+}
 
 .drill--good .timer-time {
   color: var(--ok);
