@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/riwn/cubalyst/internal/notify"
-	"github.com/riwn/cubalyst/internal/solves"
 )
 
 // 通知用の API。決まった時刻に Discord へ送る側（hatodokei の「外部から取得」のジョブなど）が、
@@ -24,53 +23,18 @@ func (s *Server) handleNotifySummary(w http.ResponseWriter, r *http.Request) {
 	if !internalOnly(w, r) {
 		return
 	}
-	q := r.URL.Query()
 	now := time.Now()
-	date := now
-	switch v := q.Get("date"); v {
-	case "":
-	case "yesterday":
-		date = now.AddDate(0, 0, -1)
-	default:
-		d, err := time.ParseInLocation("2006-01-02", v, time.Local)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, errors.New("date は YYYY-MM-DD か yesterday で指定してください"))
-			return
-		}
-		date = d
-	}
-	p, err := notify.NewPeriod(q.Get("period"), date)
+	pp, err := practicePeriod(r.URL.Query(), now)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-
-	ctx := r.Context()
-	cur, _, err := s.solves.List(ctx, solves.Filter{From: p.From, To: p.To, IncludeSplits: true, Ascending: true})
+	cur, before, cases, err := s.practiceData(r.Context(), pp)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	before, _, err := s.solves.List(ctx, solves.Filter{Mode: solves.ModeFull, To: p.From, Ascending: true})
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-	cases := map[string]string{}
-	rows, err := s.db.QueryContext(ctx, `SELECT id, name FROM cases`)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var id, name string
-		if err := rows.Scan(&id, &name); err != nil {
-			writeError(w, http.StatusInternalServerError, err)
-			return
-		}
-		cases[id] = name
-	}
+	p := notify.Period{Kind: pp.Kind, From: pp.From, To: pp.To}
 
 	payload := notify.Summary(p, cur, before, cases, now)
 	if payload == nil {

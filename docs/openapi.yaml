@@ -26,6 +26,8 @@ tags:
     description: OLL・PLL などのケースと、覚えたかどうか
   - name: 設定
   - name: 入出力
+  - name: 集計
+    description: 期間の練習の集計。文面にするのは呼ぶ側（通知の本文を作る kawaraban など）
   - name: 通知
     description: 決まった時刻に Discord へ送る側（hatodokei の「外部から取得」のジョブなど）が呼ぶ。同じマシンからリバースプロキシを通さずに呼ぶ
   - name: その他
@@ -395,6 +397,29 @@ paths:
                   errors: { type: array, items: { type: string } }
         "400": { $ref: "#/components/responses/BadRequest" }
 
+  /api/stats/practice:
+    get:
+      tags: [集計]
+      summary: 期間の練習の集計
+      description: |
+        期間（date までの7日か1日）の練習を集計する。時間はミリ秒で、フルソルブは +2 込み。無いものは null。
+
+        - full：フルソルブの回数・DNF・ベスト・平均（DNF を除く）・ao5 と ao12 のベスト（WCA 方式）、それまで（期間より前）の自己ベストと、更新したか、1つ前の同じ長さの期間の平均
+        - stages：段階のそろったフルソルブ（DNF を除く）の Cross・F2L・OLL・PLL の平均、手数・TPS
+        - days：練習した日ごとの、フルソルブの回数とベスト、ほかの練習の回数
+        - practice：ケース練習（ケースごと、多い順）・段階練習（段階ごと、多い順）・補助付きの回数
+      operationId: practiceStats
+      parameters:
+        - $ref: "#/components/parameters/period"
+        - $ref: "#/components/parameters/periodDate"
+      responses:
+        "200":
+          description: 期間の集計
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PracticeStats" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
   /api/notify/summary:
     get:
       tags: [通知]
@@ -410,14 +435,8 @@ paths:
         練習が1回も無ければ 204（送らない）。リバースプロキシを通った要求（`X-Forwarded-For` が付く）は 403
       operationId: notifySummary
       parameters:
-        - name: period
-          in: query
-          description: week＝date までの7日、day＝date の1日
-          schema: { type: string, enum: [week, day], default: week }
-        - name: date
-          in: query
-          description: 期間の最後の日（YYYY-MM-DD か yesterday）。省くと今日。月曜の朝に先週の分を送るなら yesterday
-          schema: { type: string, example: yesterday }
+        - $ref: "#/components/parameters/period"
+        - $ref: "#/components/parameters/periodDate"
       responses:
         "200":
           description: Discord に送る本文
@@ -434,6 +453,16 @@ paths:
 
 components:
   parameters:
+    period:
+      name: period
+      in: query
+      description: week＝date までの7日、day＝date の1日
+      schema: { type: string, enum: [week, day], default: week }
+    periodDate:
+      name: date
+      in: query
+      description: 期間の最後の日（YYYY-MM-DD か yesterday）。省くと今日。月曜の朝に先週の分を送るなら yesterday
+      schema: { type: string, example: yesterday }
     id:
       name: id
       in: path
@@ -472,6 +501,75 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
 
   schemas:
+    PracticeStats:
+      type: object
+      required: [period, count, full, stages, days, practice]
+      properties:
+        period:
+          type: object
+          properties:
+            kind: { type: string, enum: [week, day] }
+            from: { type: string, format: date }
+            to: { type: string, format: date, description: この日は含まない }
+        count: { type: integer, description: 期間のソルブの数（すべての種類） }
+        full:
+          type: [object, "null"]
+          description: フルソルブ。1回も無ければ null
+          properties:
+            count: { type: integer }
+            dnf: { type: integer }
+            best_ms: { type: [integer, "null"] }
+            mean_ms: { type: [number, "null"], description: DNF を除いた平均 }
+            best_ao5_ms: { type: [integer, "null"] }
+            best_ao12_ms: { type: [integer, "null"] }
+            previous_best_ms: { type: [integer, "null"], description: 期間より前の自己ベスト（単発） }
+            previous_best_ao5_ms: { type: [integer, "null"], description: 期間より前の自己ベスト（ao5） }
+            new_best: { type: boolean, description: 単発の自己ベストを更新した（前に記録があるときだけ） }
+            new_best_ao5: { type: boolean, description: ao5 の自己ベストを更新した（前に記録があるときだけ） }
+            previous_period_mean_ms: { type: [number, "null"], description: 1つ前の同じ長さの期間の平均 }
+        stages:
+          type: [object, "null"]
+          description: 段階のそろったフルソルブ（DNF を除く）の平均。無ければ null
+          properties:
+            count: { type: integer }
+            cross_ms: { type: number }
+            f2l_ms: { type: number }
+            oll_ms: { type: number }
+            pll_ms: { type: number }
+            moves: { type: number, description: 手数 }
+            tps: { type: number }
+        days:
+          type: array
+          description: 練習した日（古い順）
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date }
+              full_count: { type: integer }
+              best_ms: { type: [integer, "null"] }
+              other_count: { type: integer, description: フルソルブ以外の練習の数 }
+        practice:
+          type: object
+          properties:
+            case_count: { type: integer }
+            cases:
+              type: array
+              description: ケースごと（多い順、同じなら ID 順）
+              items: { $ref: "#/components/schemas/PracticeItem" }
+            step_count: { type: integer }
+            steps:
+              type: array
+              description: 段階ごと（多い順、同じなら ID 順）
+              items: { $ref: "#/components/schemas/PracticeItem" }
+            assist_count: { type: integer }
+
+    PracticeItem:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string, description: ケースの名前（ケースのときだけ） }
+        count: { type: integer }
+
     Error:
       type: object
       required: [error]
