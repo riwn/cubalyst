@@ -82,7 +82,7 @@ internal/solves/       ソルブと段階区切りの保存
 internal/export/       export（JSON / CSV / テキスト）と import
 internal/settings/     設定（クロス色）
 internal/analysis/     解析（入力データの集計・整形、Claude が書いた結果の保存）
-internal/notify/       Discord に送る練習のまとめの本文（/api/notify/summary）
+internal/practice/     期間の練習の集計（/api/stats/practice）
 internal/mcpserver/    MCP サーバー（`cubalyst mcp`。HTTP API を呼んでツールとして公開）
 skills/                Claude 用のスキル（MCP を使った解析の進め方）と、その入れ方（install.sh）
 web/                   フロントエンド（Vite + React + TypeScript）
@@ -121,21 +121,14 @@ data/                  DBファイル置き場（git管理外）
 | GET / DELETE | `/api/analyses/{id}` | 解析結果の取得 / 削除 |
 | GET | `/api/solves/{id}/analysis-input` | 単体の解析に渡す入力データ（MCP 用） |
 | GET | `/api/analysis-input` | まとめの解析に渡す入力データと対象のソルブ（`ids` または `mode` `from` `to` `limit`、`title`。MCP 用） |
-| GET | `/api/notify/summary` | 練習のまとめを Discord の Webhook の形（`{"message": {...}}`）で返す（`period=week\|day`、既定は week。`date=YYYY-MM-DD\|yesterday`）。練習が無ければ `204`。同じマシンからリバースプロキシを通さずに呼ぶ（`X-Forwarded-For` が付くと `403`） |
+| GET | `/api/stats/practice` | 期間の練習の集計（`period=week\|day`、既定は week。`date=YYYY-MM-DD\|yesterday`）。フルソルブのベスト・平均・ao5/ao12、自己ベストの更新、前の期間の平均、段階ごとの平均、日ごと、練習の回数 |
 | GET | `/api/openapi.yaml` | この API の仕様書（OpenAPI 3.1、[docs/openapi.yaml](openapi.yaml)） |
 
 すべての API の引数と応答の形は [docs/openapi.yaml](openapi.yaml) にあります。ルートを足したら仕様書にも足してください（`internal/server` のテストがずれを見つけます）。
 
 ### 練習のまとめを Discord に送る
 
-`/api/notify/summary` は、決まった時刻に URL を呼んで、返ってきた本文を Discord の Webhook に送る仕組み（cron と curl、通知用のアプリなど）から使います。返す形は Discord の Webhook にそのまま送れる `message` と同じです。たとえば毎週日曜の夜にその週の分を送るなら：
-
-```
-body=$(curl -fsS http://127.0.0.1:8080/api/notify/summary) && [ -n "$body" ] &&
-  printf '%s' "$body" | jq '.message' | curl -fsS -H 'Content-Type: application/json' -d @- "$DISCORD_WEBHOOK_URL"
-```
-
-月曜の朝に先週の分を送るなら `?date=yesterday`。
+cubalyst は Discord の本文を作りません。`/api/stats/practice` の集計を [kawaraban](https://github.com/riwn/kawaraban) が読んで文面にし、[hatodokei](https://github.com/riwn/hatodokei) が決まった時刻に Discord へ送ります。集計の項目を変えるときは、kawaraban の読み取り（`internal/cubalyst`）も直してください（kawaraban のテストが、読んでいる項目がこの仕様書にあるかを確かめます）。
 
 ## ケースのマスタ
 
