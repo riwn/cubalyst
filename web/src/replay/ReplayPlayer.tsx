@@ -1,10 +1,11 @@
 import type { KPuzzle } from 'cubing/kpuzzle'
 import { TwistyPlayer } from 'cubing/twisty'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Solve } from '../api'
-import { convertMove, holdRotation } from '../cube/orientation'
+import type { Solve, SolveMove } from '../api'
+import { holdRotation, type Frame } from '../cube/orientation'
 import { useHoldFrame, useSettings } from '../settings/hooks'
 import { STAGE_LABELS, type Split } from '../solve/cfop'
+import { notationTokens, type Holds } from '../solve/holds'
 import { formatTime } from '../solve/stats'
 import { solveStartPattern } from './start'
 import { positionAt, timeAfter, totalDuration } from './timeline'
@@ -17,22 +18,40 @@ type Indexer = {
   algDuration(): number
 }
 
+/** 再生の1コマ：手か持ち替え。move は回転ログでの位置（持ち替えなら null）。 */
+type Step = { text: string; t: number; move: number | null }
+
 /**
  * ソルブの再生。実際の回転タイミングどおりに3Dキューブを動かす。
- * 3D表示と手の記号は、設定の持ち方（下の色・前の色）に合わせる。
+ * 3D表示と手の記号は、持ち方（下の色・前の色）に合わせる。持ち替えの記録があれば、その時点の持ち方で書き、
+ * 持ち替えもキューブごと回して見せる。
  */
 export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzle }) {
   const { settings } = useSettings()
   const frame = useHoldFrame()
   const rawMoves = useMemo(() => solve.moves ?? [], [solve.moves])
-  const moves = useMemo(() => rawMoves.map((m) => ({ ...m, move: convertMove(frame, m.move) })), [rawMoves, frame])
+  const steps = useMemo(() => replaySteps(rawMoves, solve.holds, frame), [rawMoves, solve.holds, frame])
+  const startHold = solve.holds?.start ?? { bottom: settings.hold_bottom, front: settings.hold_front }
   const rotation = useMemo(
-    () => holdRotation(kpuzzle.defaultPattern(), settings.hold_bottom, settings.hold_front),
-    [kpuzzle, settings.hold_bottom, settings.hold_front],
+    () => holdRotation(kpuzzle.defaultPattern(), startHold.bottom, startHold.front),
+    [kpuzzle, startHold.bottom, startHold.front],
   )
-  const times = useMemo(() => moves.map((m) => m.t), [moves])
+  const times = useMemo(() => steps.map((m) => m.t), [steps])
   const total = totalDuration(times)
   const splits = solve.splits ?? []
+  // movesBefore[i]：先頭から i コマまでにある手の数
+  const movesBefore = useMemo(() => {
+    const out = [0]
+    for (const st of steps) out.push(out[out.length - 1] + (st.move === null ? 0 : 1))
+    return out
+  }, [steps])
+  /** 回転ログの n 手目（0 始まり）の直前のコマ。その前にある持ち替えも含める。 */
+  const stepOfMove = (n: number) => {
+    const i = movesBefore.findIndex((c) => c >= n)
+    let j = i < 0 ? steps.length : i
+    while (j > 0 && steps[j - 1].move === null) j--
+    return j
+  }
 
   const containerRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<TwistyPlayer | null>(null)
@@ -47,7 +66,7 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
     if (!container) return
     const player = new TwistyPlayer({
       puzzle: '3x3x3',
-      alg: moves.map((m) => m.move).join(' '),
+      alg: steps.map((m) => m.text).join(' '),
       background: 'none',
       controlPanel: 'none',
       hintFacelets: 'none',
@@ -73,7 +92,7 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
       playerRef.current = null
       setIndexer(null)
     }
-  }, [kpuzzle, solve, moves, rotation])
+  }, [kpuzzle, solve, steps, rotation])
 
   // 実時間 → TwistyPlayer のタイムライン位置
   useEffect(() => {
@@ -81,11 +100,11 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
     if (!player || !indexer) return
     const pos = positionAt(times, t)
     const ts =
-      pos.done >= moves.length
+      pos.done >= steps.length
         ? indexer.algDuration()
         : indexer.indexToMoveStartTimestamp(pos.done) + pos.fraction * indexer.moveDuration(pos.done)
     ;(player as unknown as { timestamp: number }).timestamp = ts
-  }, [t, indexer, times, moves.length])
+  }, [t, indexer, times, steps.length])
 
   // 再生ループ
   useEffect(() => {
@@ -114,7 +133,7 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
   const pos = positionAt(times, t)
   const stepTo = (n: number) => {
     setPlaying(false)
-    setT(timeAfter(times, Math.max(0, Math.min(moves.length, n))))
+    setT(timeAfter(times, Math.max(0, Math.min(steps.length, n))))
   }
   const togglePlay = () => {
     if (!playing && t >= total) setT(0)
@@ -146,9 +165,10 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const currentStage = currentSplit(splits, pos.done)
+  const movesDone = movesBefore[pos.done]
+  const currentStage = currentSplit(splits, movesDone)
 
-  if (moves.length === 0) return <p className="muted">回転ログがないため再生できません</p>
+  if (rawMoves.length === 0) return <p className="muted">回転ログがないため再生できません</p>
 
   return (
     <div className="replay">
@@ -156,12 +176,12 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
       <div className="replay-status">
         <strong>{formatTime(Math.min(t, solve.total_ms), 3)}</strong>
         <span className="muted">
-          {pos.done} / {moves.length}手{currentStage && ` ・ ${STAGE_LABELS[currentStage.stage]}`}
+          {movesDone} / {rawMoves.length}手{currentStage && ` ・ ${STAGE_LABELS[currentStage.stage]}`}
         </span>
         <span className="replay-next alg">
-          {moves.slice(pos.done, pos.done + 8).map((m, i) => (
-            <span key={pos.done + i} className={i === 0 ? 'current' : ''}>
-              {m.move}{' '}
+          {steps.slice(pos.done, pos.done + 8).map((m, i) => (
+            <span key={pos.done + i} className={[i === 0 ? 'current' : '', m.move === null ? 'rot' : ''].join(' ').trim()}>
+              {m.text}{' '}
             </span>
           ))}
         </span>
@@ -176,7 +196,7 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
                 key={s.stage}
                 className={`replay-stage ${currentStage?.stage === s.stage ? 'active' : ''}`}
                 style={{ flexGrow: width, flexBasis: 0 }}
-                onClick={() => stepTo(s.start_index)}
+                onClick={() => stepTo(stepOfMove(s.start_index))}
                 title={`${STAGE_LABELS[s.stage]}（${formatTime(s.end_ms - s.start_ms, 3)}）へジャンプ`}
               >
                 {width > 6 ? STAGE_LABELS[s.stage] : ''}
@@ -206,7 +226,7 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
           {playing ? '一時停止' : '再生'}
         </button>
         <button onClick={() => stepTo(pos.done + 1)} title="1手進む（→）">▶</button>
-        <button onClick={() => stepTo(moves.length)} title="末尾">⏭</button>
+        <button onClick={() => stepTo(steps.length)} title="末尾">⏭</button>
         <span className="spacer" />
         {SPEEDS.map((s) => (
           <button key={s} className={speed === s ? 'on-accent' : ''} onClick={() => setSpeed(s)}>
@@ -216,6 +236,23 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
       </div>
     </div>
   )
+}
+
+/** 再生のコマの列。持ち替えは、始めた時刻に置く（前後の手と順序が入れ替わらないようにする）。 */
+function replaySteps(moves: SolveMove[], holds: Holds | null | undefined, frame: Frame): Step[] {
+  const out: Step[] = []
+  for (const tok of notationTokens(moves, holds, frame)) {
+    if (tok.kind === 'move') {
+      out.push({ text: tok.text, t: moves[tok.index].t, move: tok.index })
+    } else {
+      const prev = out[out.length - 1]?.t ?? 0
+      const next = moves[tok.change.index]?.t ?? tok.change.start_t
+      const t = Math.max(prev, Math.min(tok.change.start_t, next))
+      // 「x y」のような2つの持ち替えは、TwistyPlayer では2手なので分ける
+      for (const r of tok.text.split(' ')) out.push({ text: r, t, move: null })
+    }
+  }
+  return out
 }
 
 /** done 手目の時点で取り組んでいる段階。 */
