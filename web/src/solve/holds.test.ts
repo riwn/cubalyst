@@ -118,9 +118,16 @@ describe('detectHolds', () => {
     expect(detectHolds(samples, moves(30), START)?.changes).toEqual([])
   })
 
-  it('gives up when the samples have a gap', () => {
-    const samples = rotateBetween(START, START, 0, 3000).filter((s) => s[0] < 1000 || s[0] > 2100)
-    expect(detectHolds(samples, moves(30), START)).toBeNull()
+  it('bridges a short gap', () => {
+    // 実機では 1 秒ほど届かないことがある。途切れの間に持ち替えても、前後の持ち方から分かる
+    const after = applyRotation(START, 'y')
+    const samples = rotateBetween(START, after, 1500, 3000).filter((s) => s[0] < 1000 || s[0] > 2100)
+    expect(detectHolds(samples, moves(30), START)?.changes).toMatchObject([{ rot: 'y' }])
+  })
+
+  it('gives up when the samples have a long gap', () => {
+    const samples = rotateBetween(START, START, 0, 5000).filter((s) => s[0] < 1000 || s[0] > 4100)
+    expect(detectHolds(samples, moves(50), START)).toBeNull()
   })
 
   it('gives up when the bottom color is not the setting', () => {
