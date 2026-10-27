@@ -4,13 +4,14 @@ import { useCubeStore } from '../cube/hooks'
 import { isValidHold, rightColor } from '../cube/orientation'
 import { useSettings } from '../settings/hooks'
 import { COLOR_LABELS, CROSS_COLORS, type CrossColor } from '../solve/cfop'
-import { recomputeAllSplits } from '../solve/recompute'
+import { recomputeAllHolds, recomputeAllSplits } from '../solve/recompute'
 
 /** 設定：クロス色、段階の再計算、export / import。 */
 export function SettingsPage() {
   const store = useCubeStore()
   const { settings, update } = useSettings()
   const [progress, setProgress] = useState<string | null>(null)
+  const [holdsProgress, setHoldsProgress] = useState<string | null>(null)
   const [importResult, setImportResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,6 +43,18 @@ export function SettingsPage() {
         setProgress(`再計算中… ${done} / ${total}`),
       )
       setProgress(`${n}件のステップを再計算しました`)
+    } catch (err) {
+      setError(String(err))
+    }
+  }
+
+  const recomputeHolds = async () => {
+    setError(null)
+    try {
+      const n = await recomputeAllHolds({ bottom: settings.hold_bottom, front: settings.hold_front }, (done, total) =>
+        setHoldsProgress(`再計算中… ${done} / ${total}`),
+      )
+      setHoldsProgress(`ジャイロの記録がある${n}件の持ち替えを再計算しました`)
     } catch (err) {
       setError(String(err))
     }
@@ -133,6 +146,30 @@ export function SettingsPage() {
               → 右は <span className={`swatch swatch--${right}`} /> {COLOR_LABELS[right]}
             </span>
           )}
+        </div>
+      </section>
+
+      <section className="panel">
+        <h3>ジャイロ（持ち替えの記録）</h3>
+        <label className="radio">
+          <input
+            type="checkbox"
+            checked={settings.use_gyro}
+            onChange={(e) => update({ ...settings, use_gyro: e.target.checked }).catch((err) => setError(String(err)))}
+          />
+          ジャイロで持ち替え（y・x・z）を記録する
+        </label>
+        <p className="muted small">
+          ジャイロのあるキューブ（GAN i4 などの Gen4）で、ソルブ中の持ち替えを記録し、解法をその時点の持ち方で表示します。
+          着手の時点で上の「持ち方」で持っていると仮定します（下の色はジャイロで分かるので、違えば記録しません）。
+        </p>
+        <p className="muted small">
+          ジャイロは電池を多く使います。キューブのジャイロは、GAN のアプリの省電力の設定で切り替えてください（キューブに保存されます）。
+          ここをオフにしても、キューブ側のジャイロは止まりません。
+        </p>
+        <div className="row">
+          <button onClick={recomputeHolds}>全ソルブの持ち替えを再計算</button>
+          {holdsProgress && <span className="muted">{holdsProgress}</span>}
         </div>
       </section>
 

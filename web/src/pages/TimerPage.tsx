@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { CubeView } from '../components/CubeView'
 import { FitLayout } from '../components/FitLayout'
+import { GyroDebug } from '../components/GyroDebug'
 import { ManualTimer } from '../components/ManualTimer'
 import { MockControls } from '../components/MockControls'
 import { MoveLog } from '../components/MoveLog'
@@ -73,9 +74,10 @@ export function TimerPage() {
           {state && <MockControls {...mockShortcuts(state)} />}
           {debug && (
             <details className="debug" open>
-              <summary>デバッグ情報（回転ログ・facelets）</summary>
+              <summary>デバッグ情報（回転ログ・facelets・ジャイロ）</summary>
               <MoveLog />
               <FaceletsInfo />
+              <GyroDebug />
             </details>
           )}
         </>

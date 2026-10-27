@@ -51,6 +51,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/solves/{id}", s.handleUpdateSolve)
 	mux.HandleFunc("DELETE /api/solves/{id}", s.handleDeleteSolve)
 	mux.HandleFunc("PUT /api/solves/{id}/splits", s.handleReplaceSplits)
+	mux.HandleFunc("PUT /api/solves/{id}/holds", s.handleReplaceHolds)
 	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
 	mux.HandleFunc("PUT /api/settings", s.handlePutSettings)
 	mux.HandleFunc("GET /api/export", s.handleExport)

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useCubeState } from '../cube/hooks'
 import { MockConnection, parseMoveLog } from '../cube/mock'
+import { useSettings } from '../settings/hooks'
 
 const FACES = ['U', 'R', 'F', 'D', 'L', 'B']
+const ROTATIONS = ['y', 'x', 'z']
 
 type Shortcuts = {
   /** 「スクランブルを回す」で流す手順（残りのスクランブル）。 */
@@ -23,6 +25,12 @@ function MockControlsInner({ mock, scramble, solution }: { mock: MockConnection 
   const [speed, setSpeed] = useState(1)
   const [playing, setPlaying] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [gyro, setGyro] = useState(mock.gyroHold !== null)
+  const { settings } = useSettings()
+  const toggleGyro = (on: boolean) => {
+    mock.setGyro(on ? { bottom: settings.hold_bottom, front: settings.hold_front } : null)
+    setGyro(on)
+  }
 
   // キーボード: U/R/F/D/L/B（Shiftで逆回転）。入力欄にフォーカスがあるときは無視する。
   useEffect(() => {
@@ -89,6 +97,20 @@ function MockControlsInner({ mock, scramble, solution }: { mock: MockConnection 
         ))}
       </div>
       <p className="muted small">キーボード: U R F D L B（Shiftで逆回転）</p>
+      <label className="radio">
+        <input type="checkbox" checked={gyro} onChange={(e) => toggleGyro(e.target.checked)} />
+        ジャイロを流す（設定の持ち方から）
+      </label>
+      {gyro && (
+        <div className="move-buttons">
+          {ROTATIONS.map((r) => (
+            <div key={r} className="move-pair">
+              <button onClick={() => mock.rotateHold(r)}>{r}</button>
+              <button onClick={() => mock.rotateHold(`${r}'`)}>{r}'</button>
+            </div>
+          ))}
+        </div>
+      )}
       <label className="block">
         回転ログを再生（JSON配列 または "R U R' U'"）
         <textarea

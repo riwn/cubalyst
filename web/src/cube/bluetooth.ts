@@ -112,7 +112,15 @@ class BluetoothCubeConnection implements CubeConnection {
       reset: conn.capabilities.reset,
     }
     // イベントの取りこぼしを防ぐため、生成時点で購読してEmitterに流す。
+    // ジャイロの軸と色の対応は、実機で確かめたプロトコルだけ使う（docs/plans/phase-9.md）。
+    const gyro = GYRO_PROTOCOLS.has(conn.protocol.name)
+    let unsupportedSent = false
     conn.events$.subscribe((e) => {
+      if (e.type === 'GYRO' && !gyro) {
+        if (!unsupportedSent) this.emitter.emit({ type: 'gyro-unsupported' })
+        unsupportedSent = true
+        return
+      }
       const mapped = mapEvent(e)
       if (mapped) this.emitter.emit(mapped)
     })
@@ -139,6 +147,9 @@ class BluetoothCubeConnection implements CubeConnection {
   }
 }
 
+/** ジャイロの向き（+X 赤・+Y 青・+Z 白、Z が鉛直上向き）を確かめたプロトコル。 */
+const GYRO_PROTOCOLS = new Set(['GAN Gen4'])
+
 function mapEvent(e: SmartCubeEvent): CubeEvent | null {
   switch (e.type) {
     case 'MOVE':
@@ -153,6 +164,8 @@ function mapEvent(e: SmartCubeEvent): CubeEvent | null {
       return e.facelets.length === 54 ? { type: 'facelets', facelets: e.facelets } : null
     case 'BATTERY':
       return { type: 'battery', level: e.batteryLevel }
+    case 'GYRO':
+      return { type: 'gyro', timestamp: e.timestamp, q: e.quaternion }
     case 'DISCONNECT':
       return { type: 'disconnect' }
     default:

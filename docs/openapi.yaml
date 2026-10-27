@@ -76,7 +76,7 @@ paths:
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
         - name: include
           in: query
-          description: 一緒に返すもの（カンマ区切り）。moves＝回転ログ、splits＝段階、analyses＝解析の数
+          description: 一緒に返すもの（カンマ区切り）。moves＝回転ログとジャイロの生データ、splits＝段階、analyses＝解析の数
           schema: { type: string, example: "splits,analyses" }
         - name: sort
           in: query
@@ -169,6 +169,30 @@ paths:
         content:
           application/json:
             schema: { type: array, items: { $ref: "#/components/schemas/Split" } }
+      responses:
+        "200":
+          description: 置き換えたあとのソルブ
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Solve" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/solves/{id}/holds:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    put:
+      tags: [ソルブ]
+      summary: 持ち替えを置き換える（ジャイロの生データから計算し直したとき）
+      operationId: replaceHolds
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/Holds"
+                - { type: "null", description: 持ち替えの記録なしにする }
       responses:
         "200":
           description: 置き換えたあとのソルブ
@@ -582,6 +606,17 @@ components:
           type: array
           description: CFOP の段階（一覧では include=splits のときだけ）
           items: { $ref: "#/components/schemas/Split" }
+        gyro:
+          type: array
+          description: ジャイロの生データ（一覧では include=moves のときだけ。ジャイロの無いソルブには無い）
+          items:
+            type: array
+            description: "[t, w, x, y, z]。t はソルブ開始からの相対ミリ秒（moves の t と同じ基準）、w〜z はキューブの向きのクォータニオン"
+            items: { type: number }
+            minItems: 5
+            maxItems: 5
+        holds:
+          $ref: "#/components/schemas/Holds"
         analyses:
           type: object
           readOnly: true
@@ -610,6 +645,35 @@ components:
         start_index: { type: integer, description: "回転ログ上の範囲 [start_index, end_index)" }
         end_index: { type: integer }
 
+    Holds:
+      type: object
+      description: ジャイロから計算した持ち替え（持ち方の移り変わり）。記録が無いソルブには無い
+      properties:
+        start: { $ref: "#/components/schemas/Hold" }
+        estimated: { type: boolean, description: 着手時の前の色を、回した手の偏り（R・F が多く B が少ない向き）から推定したか。false なら設定の前の色を仮定した }
+        from_t: { type: number, description: 持ち替えを記録し始めた時刻（ソルブ開始からの相対ミリ秒）。着手の時点で傾けていたら、持ち方が落ち着いたところから。無ければ着手の時点から }
+        changes:
+          type: array
+          items:
+            type: object
+            properties:
+              index: { type: integer, description: "回転ログで、この持ち替えより前にある手の数（moves[index] 以降が新しい持ち方）" }
+              start_t: { type: number, description: 持ち替えを始める前の、最後の落ち着いた時刻（ソルブ開始からの相対ミリ秒） }
+              end_t: { type: number, description: 新しい持ち方で落ち着いた時刻 }
+              bottom: { type: string }
+              front: { type: string }
+              rot: { type: string, description: "持ち替えの記号（y、x'、x y など）", example: "y'" }
+              with_move: { type: boolean, description: L・R の回転と同時に起きた x 系（ワイドムーブやスライスの一部）。持ち替えの回数には数えない }
+              slice: { type: string, enum: [M, "M'", M2], description: "with_move のうち、L・R の組と合わせてスライスになるもの（M' = R' L x、M = R L' x'、M2 = R2 L2 x2）" }
+              slice_moves: { type: array, items: { type: integer }, description: slice の L・R の手（回転ログの添字）。表記ではこの手と持ち替えを slice_moves[0] の位置に1語でまとめる }
+
+    Hold:
+      type: object
+      description: 持ち方
+      properties:
+        bottom: { type: string, enum: [white, yellow, green, blue, red, orange] }
+        front: { type: string, enum: [white, yellow, green, blue, red, orange] }
+
     Settings:
       type: object
       additionalProperties: false
@@ -618,6 +682,7 @@ components:
         hold_bottom: { type: string, description: 解くときの持ち方（下の色）, default: white }
         hold_front: { type: string, description: 解くときの持ち方（前の色）, default: green }
         inspection: { type: boolean, description: フルソルブで 15 秒のインスペクションを使うか, default: true }
+        use_gyro: { type: boolean, description: ジャイロで持ち替えを記録するか, default: false }
 
     Case:
       type: object

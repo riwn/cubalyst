@@ -18,6 +18,8 @@ type Settings struct {
 	HoldFront  string `json:"hold_front"`
 	// Inspection はフルソルブでWCA方式の15秒インスペクションを使うか。
 	Inspection bool `json:"inspection"`
+	// UseGyro はジャイロで持ち替えを記録するか。ジャイロのデータはキューブ側（GAN のアプリの省電力）で切る。
+	UseGyro bool `json:"use_gyro"`
 }
 
 // Defaults は未設定時の値。
@@ -82,6 +84,8 @@ func (st *Store) Get(ctx context.Context) (Settings, error) {
 			s.HoldFront = v
 		case "inspection":
 			s.Inspection = v == "1"
+		case "use_gyro":
+			s.UseGyro = v == "1"
 		}
 	}
 	return s, rows.Err()
@@ -97,11 +101,10 @@ func (st *Store) Put(ctx context.Context, s Settings) error {
 		return err
 	}
 	defer tx.Rollback()
-	inspection := "0"
-	if s.Inspection {
-		inspection = "1"
-	}
-	for k, v := range map[string]string{"cross_color": s.CrossColor, "hold_bottom": s.HoldBottom, "hold_front": s.HoldFront, "inspection": inspection} {
+	for k, v := range map[string]string{
+		"cross_color": s.CrossColor, "hold_bottom": s.HoldBottom, "hold_front": s.HoldFront,
+		"inspection": boolValue(s.Inspection), "use_gyro": boolValue(s.UseGyro),
+	} {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO settings (key, value) VALUES (?, ?)
 			ON CONFLICT (key) DO UPDATE SET value = excluded.value,
 			updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`, k, v); err != nil {
@@ -109,4 +112,11 @@ func (st *Store) Put(ctx context.Context, s Settings) error {
 		}
 	}
 	return tx.Commit()
+}
+
+func boolValue(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
 }

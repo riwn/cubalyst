@@ -919,6 +919,13 @@ a:hover {
   word-break: break-word;
 }
 
+/* 持ち替え（ジャイロで記録した y・x・z） */
+.alg .rot,
+.gyro-debug .rot {
+  color: var(--warn);
+  font-weight: 700;
+}
+
 .history-table,
 .splits-table {
   width: 100%;

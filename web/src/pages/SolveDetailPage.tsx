@@ -14,10 +14,10 @@ import { AnalysisCard, AnalysisHowTo } from '../components/AnalysisCard'
 import { StepShareDonut } from '../components/charts'
 import { ConfirmDialog } from '../ui/Dialog'
 import { KebabMenu } from '../ui/Popover'
-import { SplitsTable } from '../components/SplitsTable'
+import { NotationLine, SplitsTable } from '../components/SplitsTable'
 import { useCubeStore } from '../cube/hooks'
 import { ReplayPlayer } from '../replay/ReplayPlayer'
-import { convertMove } from '../cube/orientation'
+import { isRegrip, notationTokens } from '../solve/holds'
 import { useHoldFrame, useSettings } from '../settings/hooks'
 import { computeSplits, COLOR_LABELS } from '../solve/cfop'
 import { effectiveTime, formatTime, type Penalty } from '../solve/stats'
@@ -135,10 +135,13 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
       <section className="panel">
         <h3>ステップ</h3>
         {(solve.splits ?? []).length > 0 && <StepShareDonut splits={solve.splits ?? []} totalMs={solve.total_ms} />}
-        <SplitsTable splits={solve.splits ?? []} moves={moves} totalMs={solve.total_ms} />
+        <SplitsTable splits={solve.splits ?? []} moves={moves} holds={solve.holds} totalMs={solve.total_ms} />
         {(solve.splits ?? []).length === 0 && moves.length > 0 && (
-          <p className="alg">{moves.map((m) => convertMove(frame, m.move)).join(' ')}</p>
+          <p className="alg">
+            <NotationLine tokens={notationTokens(moves, solve.holds, frame)} />
+          </p>
         )}
+        <HoldsNote solve={solve} />
       </section>
 
       <section className="panel">
@@ -156,6 +159,34 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
       <SolveAnalyses solveId={solve.id} />
     </div>
   )
+}
+
+/** 持ち替えの記録についての一言。ジャイロを使っていない（記録も無い）ソルブでは何も出さない。 */
+function HoldsNote({ solve }: { solve: Solve }) {
+  const { settings } = useSettings()
+  const h = solve.holds
+  if (h) {
+    const n = h.changes.filter(isRegrip).length
+    const slices = h.changes.filter((c) => c.slice).length
+    return (
+      <p className="muted small">
+        ジャイロで記録した持ち替え {n}回（着手時：下が{COLOR_LABELS[h.start.bottom]}・前が{COLOR_LABELS[h.start.front]}。
+        {h.estimated ? '前の色は回した手から推定' : '前の色は設定のまま。回した手からは決められませんでした'}）。
+        {h.from_t != null &&
+          `着手時は傾けていたので、持ち替えは下の色が落ち着いた ${(h.from_t / 1000).toFixed(1)}秒から記録しています。`}
+        {slices > 0 && `スライス（M）${slices}回は、持ち替えではなく手として書いています。`}
+        解法はその時点の持ち方の記号です。
+      </p>
+    )
+  }
+  if (solve.gyro?.length) {
+    return (
+      <p className="muted small">
+        持ち替えの記録なし（ジャイロのデータはありますが、持ち方が落ち着かなかったか、途中で途切れたため、持ち方を決められませんでした）
+      </p>
+    )
+  }
+  return settings.use_gyro ? <p className="muted small">持ち替えの記録なし（ジャイロのデータがありません）</p> : null
 }
 
 /** このソルブの単体の解析と、このソルブを含むまとめ解析へのリンク。 */

@@ -1,5 +1,7 @@
 // キューブ接続の共通インターフェース。実機（Bluetooth）とモックの両方がこれを実装する。
 
+import type { Quat } from './gyro'
+
 /** 1回の回転。タイムスタンプはミリ秒。 */
 export type CubeMove = {
   move: string
@@ -13,6 +15,10 @@ export type CubeEvent =
   | ({ type: 'move' } & CubeMove)
   | { type: 'facelets'; facelets: string }
   | { type: 'battery'; level: number }
+  /** ジャイロ（キューブの向き）。timestamp は PC 側の時刻（performance.now() 基準）。 */
+  | { type: 'gyro'; timestamp: number; q: Quat }
+  /** ジャイロのデータは届いたが、軸と色の対応を確かめていないキューブなので使わない。 */
+  | { type: 'gyro-unsupported' }
   | { type: 'disconnect' }
 
 export type CubeConnectionInfo = {

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { canWatchAdvertisements, connectBluetoothCube, isWebBluetoothAvailable, normalizeMac } from '../cube/bluetooth'
 import { useCubeState, useCubeStore } from '../cube/hooks'
 import { MockConnection } from '../cube/mock'
+import type { GyroStatus } from '../cube/store'
+import { useSettings } from '../settings/hooks'
 import { useDebug } from '../ui/prefs'
 import { Dialog } from '../ui/Dialog'
 import { Popover } from '../ui/Popover'
@@ -14,6 +16,7 @@ export function CubeConnectionControl() {
   const store = useCubeStore()
   const state = useCubeState()
   const debug = useDebug()
+  const { settings } = useSettings()
   const { status, connection } = state
 
   const connectBluetooth = () =>
@@ -47,6 +50,7 @@ export function CubeConnectionControl() {
 
   const battery = state.battery
   const low = battery != null && battery <= 15
+  const gyro = gyroNotice(settings.use_gyro, state.gyro)
   return (
     <Popover
       className="conn-menu"
@@ -57,6 +61,7 @@ export function CubeConnectionControl() {
           <span className={`status-dot ${state.resyncCount > 0 ? 'status-dot--warn' : 'status-dot--on'}`} aria-hidden />
           <span className="conn-name">{connection.info.deviceName}</span>
           {battery != null && <span className={low ? 'error' : 'muted'}> {battery}%</span>}
+          {gyro?.recording && <span className="muted small" title="ジャイロで持ち替えを記録中"> ジャイロ</span>}
         </>
       }
     >
@@ -77,6 +82,12 @@ export function CubeConnectionControl() {
             )}
             <dt>バッテリー</dt>
             <dd className={low ? 'error' : ''}>{battery == null ? '--' : `${battery}%`}</dd>
+            {gyro && (
+              <>
+                <dt>ジャイロ</dt>
+                <dd className={gyro.warn ? 'warn' : ''}>{gyro.text}</dd>
+              </>
+            )}
           </dl>
           {state.resyncCount > 0 && (
             <p className="warn small">実機とのズレを検出し、実機の状態に合わせました（{state.resyncCount}回）</p>
@@ -103,6 +114,25 @@ export function CubeConnectionControl() {
 }
 
 /** キューブ接続のエラー（閉じられるバナー）と、MACアドレスの入力ダイアログ。 */
+/** 設定（ジャイロを使うか）と、データが届いているかの組み合わせで出す文言。何も出さないときは null。 */
+function gyroNotice(useGyro: boolean, status: GyroStatus): { text: string; warn: boolean; recording: boolean } | null {
+  if (status === 'unsupported') {
+    return useGyro ? { text: 'このキューブのジャイロには対応していません。持ち替えは記録されません', warn: true, recording: false } : null
+  }
+  if (useGyro) {
+    return status === 'active'
+      ? { text: '記録中', warn: false, recording: true }
+      : {
+          text: '届いていません（GAN のアプリで省電力がオンか、ジャイロの無いキューブ）。持ち替えは記録されません',
+          warn: true,
+          recording: false,
+        }
+  }
+  return status === 'active'
+    ? { text: '使っていません（キューブ側でオンのままです。GAN のアプリで省電力にすると電池が持ちます）', warn: false, recording: false }
+    : null
+}
+
 export function CubeNotices() {
   const store = useCubeStore()
   const state = useCubeState()
