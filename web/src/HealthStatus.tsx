@@ -79,7 +79,7 @@ export function SystemMenu() {
             </dl>
             <label className="radio">
               <input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} />
-              デバッグ表示（回転ログ・facelets・モック接続）
+              デバッグ表示（回転ログ・facelets・ジャイロ・モック接続）
             </label>
           </div>
         )}

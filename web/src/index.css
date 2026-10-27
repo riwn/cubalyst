@@ -920,7 +920,8 @@ a:hover {
 }
 
 /* 持ち替え（ジャイロで記録した y・x・z） */
-.alg .rot {
+.alg .rot,
+.gyro-debug .rot {
   color: var(--warn);
   font-weight: 700;
 }
