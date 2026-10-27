@@ -1,7 +1,7 @@
 import type { SolveMove } from '../api'
 import { useHoldFrame } from '../settings/hooks'
 import { STAGE_LABELS, type Split } from '../solve/cfop'
-import { notationTokens, type HoldChange, type Holds, type NotationToken } from '../solve/holds'
+import { isRegrip, notationTokens, type HoldChange, type Holds, type NotationToken } from '../solve/holds'
 import { formatTime } from '../solve/stats'
 
 function tps(moves: number, ms: number): string {
@@ -11,7 +11,8 @@ function tps(moves: number, ms: number): string {
 /** 持ち替えの所要時間（秒）と、ワイドムーブかもしれないことの説明。 */
 function rotationTitle(c: HoldChange): string {
   const sec = ((c.end_t - c.start_t) / 1000).toFixed(2)
-  return `持ち替え ${c.rot}（${sec}秒）` + (c.with_move ? '。L・R と同時なので、ワイドムーブやスライスの一部かもしれません' : '')
+  if (c.slice) return `スライス ${c.slice}（キューブは L・R と ${c.rot} として記録）`
+  return `持ち替え ${c.rot}（${sec}秒）` + (c.with_move ? '。L・R と同時なので、ワイドムーブやスライスの一部かもしれません（持ち替えの数には入れていません）' : '')
 }
 
 /** 解法の表示。持ち替えは色を変え、所要時間をツールチップで出す。 */
@@ -22,7 +23,7 @@ export function NotationLine({ tokens }: { tokens: NotationToken[] }) {
         <span
           key={i}
           className={t.kind === 'rotation' ? 'rot' : undefined}
-          title={t.kind === 'rotation' ? rotationTitle(t.change) : undefined}
+          title={t.kind === 'move' ? undefined : rotationTitle(t.change)}
         >
           {i > 0 && ' '}
           {t.text}
@@ -59,7 +60,7 @@ export function SplitsTable({
           <th>割合</th>
           <th>手数</th>
           <th>TPS</th>
-          {holds && <th title="持ち替えの回数（合計の秒数）">持ち替え</th>}
+          {holds && <th title="持ち替えの回数（合計の秒数）。L・R と同時の x 系（スライスやワイドムーブ）は数えない">持ち替え</th>}
           <th className="left">解法</th>
         </tr>
       </thead>
@@ -67,7 +68,7 @@ export function SplitsTable({
         {splits.map((s) => {
           const ms = s.end_ms - s.start_ms
           const tokens = moves ? notationTokens(moves, holds, frame, s.start_index, s.end_index) : []
-          const rots = tokens.flatMap((t) => (t.kind === 'rotation' ? [t.change] : []))
+          const rots = tokens.flatMap((t) => (t.kind === 'rotation' && isRegrip(t.change) ? [t.change] : []))
           const rotMs = rots.reduce((sum, c) => sum + (c.end_t - c.start_t), 0)
           return (
             <tr key={s.stage}>

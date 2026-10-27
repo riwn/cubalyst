@@ -17,7 +17,7 @@ import { KebabMenu } from '../ui/Popover'
 import { NotationLine, SplitsTable } from '../components/SplitsTable'
 import { useCubeStore } from '../cube/hooks'
 import { ReplayPlayer } from '../replay/ReplayPlayer'
-import { notationTokens } from '../solve/holds'
+import { isRegrip, notationTokens } from '../solve/holds'
 import { useHoldFrame, useSettings } from '../settings/hooks'
 import { computeSplits, COLOR_LABELS } from '../solve/cfop'
 import { effectiveTime, formatTime, type Penalty } from '../solve/stats'
@@ -166,11 +166,13 @@ function HoldsNote({ solve }: { solve: Solve }) {
   const { settings } = useSettings()
   const h = solve.holds
   if (h) {
-    const n = h.changes.length
+    const n = h.changes.filter(isRegrip).length
+    const slices = h.changes.filter((c) => c.slice).length
     return (
       <p className="muted small">
         ジャイロで記録した持ち替え {n}回（着手時：下が{COLOR_LABELS[h.start.bottom]}・前が{COLOR_LABELS[h.start.front]}。
         {h.estimated ? '前の色は回した手から推定' : '前の色は設定のまま。回した手からは決められませんでした'}）。
+        {slices > 0 && `スライス（M）${slices}回は、持ち替えではなく手として書いています。`}
         解法はその時点の持ち方の記号です。
       </p>
     )

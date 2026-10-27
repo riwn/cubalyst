@@ -19,7 +19,8 @@ type Indexer = {
 }
 
 /** 再生の1コマ：手か持ち替え。move は回転ログでの位置（持ち替えなら null）。 */
-type Step = { text: string; t: number; move: number | null }
+/** 再生の1コマ。moves はこのコマに当たる回転ログの手の数（持ち替えは 0、スライスは L・R の組の数）。 */
+type Step = { text: string; t: number; moves: number }
 
 /**
  * ソルブの再生。実際の回転タイミングどおりに3Dキューブを動かす。
@@ -42,14 +43,14 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
   // movesBefore[i]：先頭から i コマまでにある手の数
   const movesBefore = useMemo(() => {
     const out = [0]
-    for (const st of steps) out.push(out[out.length - 1] + (st.move === null ? 0 : 1))
+    for (const st of steps) out.push(out[out.length - 1] + st.moves)
     return out
   }, [steps])
   /** 回転ログの n 手目（0 始まり）の直前のコマ。その前にある持ち替えも含める。 */
   const stepOfMove = (n: number) => {
     const i = movesBefore.findIndex((c) => c >= n)
     let j = i < 0 ? steps.length : i
-    while (j > 0 && steps[j - 1].move === null) j--
+    while (j > 0 && steps[j - 1].moves === 0) j--
     return j
   }
 
@@ -180,7 +181,7 @@ export function ReplayPlayer({ solve, kpuzzle }: { solve: Solve; kpuzzle: KPuzzl
         </span>
         <span className="replay-next alg">
           {steps.slice(pos.done, pos.done + 8).map((m, i) => (
-            <span key={pos.done + i} className={[i === 0 ? 'current' : '', m.move === null ? 'rot' : ''].join(' ').trim()}>
+            <span key={pos.done + i} className={[i === 0 ? 'current' : '', m.moves === 0 ? 'rot' : ''].join(' ').trim()}>
               {m.text}{' '}
             </span>
           ))}
@@ -243,13 +244,16 @@ function replaySteps(moves: SolveMove[], holds: Holds | null | undefined, frame:
   const out: Step[] = []
   for (const tok of notationTokens(moves, holds, frame)) {
     if (tok.kind === 'move') {
-      out.push({ text: tok.text, t: moves[tok.index].t, move: tok.index })
+      out.push({ text: tok.text, t: moves[tok.index].t, moves: 1 })
+    } else if (tok.kind === 'slice') {
+      const idx = tok.change.slice_moves!
+      out.push({ text: tok.text, t: Math.max(out[out.length - 1]?.t ?? 0, moves[idx[0]].t), moves: idx.length })
     } else {
       const prev = out[out.length - 1]?.t ?? 0
       const next = moves[tok.change.index]?.t ?? tok.change.start_t
       const t = Math.max(prev, Math.min(tok.change.start_t, next))
       // 「x y」のような2つの持ち替えは、TwistyPlayer では2手なので分ける
-      for (const r of tok.text.split(' ')) out.push({ text: r, t, move: null })
+      for (const r of tok.text.split(' ')) out.push({ text: r, t, moves: 0 })
     }
   }
   return out

@@ -37,22 +37,46 @@ func changesIn(s solves.Solve, from, to int) []solves.HoldChange {
 }
 
 // algWithRotations は moves[from, to) の解法に持ち替えを入れた表記。同じ面の続きは持ち替えをまたがずにまとめる。
+// スライスになる L・R の組と持ち替えは、M などの1語にする。
 // s の回転ログは持ち方の記号に変換済みであること（export.WithFrame）。
 func algWithRotations(s solves.Solve, from, to int) string {
 	from, to = min(from, len(s.Moves)), min(to, len(s.Moves))
+	sliceAt, used := s.Holds.Slices()
 	var parts []string
-	seg := from
-	for _, c := range changesIn(s, from, to) {
-		if m := mergeMoves(s.Moves[seg:c.Index]); m != "" {
+	var seg []solves.Move
+	flush := func() {
+		if m := mergeMoves(seg); m != "" {
 			parts = append(parts, m)
 		}
-		parts = append(parts, rotText(c))
-		seg = c.Index
+		seg = nil
 	}
-	if m := mergeMoves(s.Moves[seg:to]); m != "" {
-		parts = append(parts, m)
+	for i := from; i < to; i++ {
+		for _, c := range changesIn(s, i, i+1) {
+			if c.Slice == "" {
+				flush()
+				parts = append(parts, rotText(c))
+			}
+		}
+		if c, ok := sliceAt[i]; ok {
+			seg = append(seg, solves.Move{Move: c.Slice})
+		}
+		if !used[i] {
+			seg = append(seg, s.Moves[i])
+		}
 	}
+	flush()
 	return strings.Join(parts, " ")
+}
+
+// regripsIn は changesIn のうち、解く人が持ち替えたもの。
+func regripsIn(s solves.Solve, from, to int) []solves.HoldChange {
+	var out []solves.HoldChange
+	for _, c := range changesIn(s, from, to) {
+		if c.IsRegrip() {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // stageRotation は1段階の持ち替え：回数、合計の時間、そのうち最初の手より前（認識中）の時間（ms）。
@@ -67,7 +91,7 @@ func rotationOf(s solves.Solve, sp solves.Split) stageRotation {
 	if sp.MoveCount > 0 && sp.StartIndex < len(s.Moves) {
 		first = s.Moves[sp.StartIndex].T
 	}
-	for _, c := range changesIn(s, sp.StartIndex, sp.EndIndex) {
+	for _, c := range regripsIn(s, sp.StartIndex, sp.EndIndex) {
 		r.count++
 		r.ms += c.EndT - c.StartT
 		if c.Index == sp.StartIndex {
@@ -86,8 +110,9 @@ func holdsLine(s solves.Solve, holdDescription string) string {
 		if s.Holds.Estimated {
 			front = "前の色は回した手の偏りから推定"
 		}
+		n := len(regripsIn(s, 0, len(s.Moves)+1))
 		return fmt.Sprintf("ジャイロで記録（着手時：%s。%s）。手の記号は、その時点の持ち方での面の名前です。持ち替えは %d 回",
-			holdDescriptionOf(s.Holds.Start), front, len(s.Holds.Changes))
+			holdDescriptionOf(s.Holds.Start), front, n)
 	case len(s.Gyro) > 0:
 		return holdDescription + "（固定）。ジャイロのデータはあるが、着手時の下の色が設定と違うか途中で途切れたため、持ち替えは記録なし"
 	default:
@@ -104,7 +129,7 @@ func holdDescriptionOf(h solves.Hold) string {
 // pauseRotation は手と手の間（prev〜next の時刻）にある持ち替えの説明。無ければ空。
 func pauseRotation(s solves.Solve, index int) string {
 	var parts []string
-	for _, c := range changesIn(s, index, index+1) {
+	for _, c := range regripsIn(s, index, index+1) {
 		parts = append(parts, fmt.Sprintf("%s の持ち替え %s秒", rotText(c), sec(c.EndT-c.StartT)))
 	}
 	if len(parts) == 0 {
@@ -145,12 +170,13 @@ func multiRotations(list []solves.Solve) string {
 			recogMS += r.recogMS
 		}
 		for _, c := range s.Holds.Changes {
+			if !c.IsRegrip() {
+				withMove++
+				continue
+			}
 			total++
 			totalMS += c.EndT - c.StartT
 			kinds[c.Rot]++
-			if c.WithMove {
-				withMove++
-			}
 		}
 	}
 	fmt.Fprintf(&b, "- 1ソルブあたり: %.1f回、%s秒（うち段階の最初の手より前＝認識中 %s秒）\n",
@@ -183,7 +209,7 @@ func multiRotations(list []solves.Solve) string {
 		fmt.Fprintf(&b, "\n- 多い持ち替え: %s\n", strings.Join(parts, " / "))
 	}
 	if withMove > 0 {
-		fmt.Fprintf(&b, "- うち L・R と同時の x 系（ワイドムーブやスライスの一部かもしれない）: %d回\n", withMove)
+		fmt.Fprintf(&b, "- ほかに L・R と同時の x 系（スライス M やワイドムーブで中心ごと回ったもの）: %d回。上の回数には入れていない\n", withMove)
 	}
 	return b.String()
 }

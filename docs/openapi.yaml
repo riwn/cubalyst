@@ -662,7 +662,9 @@ components:
               bottom: { type: string }
               front: { type: string }
               rot: { type: string, description: "持ち替えの記号（y、x'、x y など）", example: "y'" }
-              with_move: { type: boolean, description: L・R の回転と同時に起きた x 系の持ち替え（ワイドムーブやスライスの一部かもしれない） }
+              with_move: { type: boolean, description: L・R の回転と同時に起きた x 系（ワイドムーブやスライスの一部）。持ち替えの回数には数えない }
+              slice: { type: string, enum: [M, "M'", M2], description: "with_move のうち、L・R の組と合わせてスライスになるもの（M' = R' L x、M = R L' x'、M2 = R2 L2 x2）" }
+              slice_moves: { type: array, items: { type: integer }, description: slice の L・R の手（回転ログの添字）。表記ではこの手と持ち替えを slice_moves[0] の位置に1語でまとめる }
 
     Hold:
       type: object

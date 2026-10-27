@@ -176,3 +176,28 @@ func TestMultiInputWithHolds(t *testing.T) {
 		t.Errorf("no gyro:\n%s", in)
 	}
 }
+
+func TestAlgWithSlices(t *testing.T) {
+	mv := func(ms ...string) []solves.Move {
+		out := make([]solves.Move, len(ms))
+		for i, m := range ms {
+			out[i] = solves.Move{Move: m, T: float64(i * 100)}
+		}
+		return out
+	}
+	s := solves.Solve{
+		Moves: mv("U", "R'", "L", "U", "R", "R", "L", "L", "U"),
+		Holds: &solves.Holds{Start: solves.Hold{Bottom: "white", Front: "green"}, Changes: []solves.HoldChange{
+			{Index: 2, StartT: 100, EndT: 200, Bottom: "green", Front: "yellow", Rot: "x", WithMove: true, Slice: "M'", SliceMoves: []int{1, 2}},
+			{Index: 6, StartT: 400, EndT: 700, Bottom: "blue", Front: "white", Rot: "x2", WithMove: true, Slice: "M2", SliceMoves: []int{4, 5, 6, 7}},
+			{Index: 9, StartT: 800, EndT: 900, Bottom: "blue", Front: "red", Rot: "y"},
+		}},
+	}
+	if got, want := algWithRotations(s, 0, 9), "U M' U M2 U"; got != want {
+		t.Errorf("alg = %q, want %q", got, want)
+	}
+	// スライスは持ち替えに数えない
+	if got := regripsIn(s, 0, 10); len(got) != 1 || got[0].Rot != "y" {
+		t.Errorf("regrips = %+v", got)
+	}
+}

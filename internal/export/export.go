@@ -220,15 +220,21 @@ func movesIn(s solves.Solve, from, to int) string {
 		to = len(moves)
 	}
 	parts := make([]string, 0, to-from)
+	sliceAt, used := s.Holds.Slices()
 	for i := from; i < to; i++ {
 		if s.Holds != nil {
 			for _, c := range s.Holds.Changes {
-				if c.Index == i {
+				if c.Index == i && c.Slice == "" {
 					parts = append(parts, c.Rot)
 				}
 			}
 		}
-		parts = append(parts, moves[i].Move)
+		if c, ok := sliceAt[i]; ok {
+			parts = append(parts, c.Slice)
+		}
+		if !used[i] {
+			parts = append(parts, moves[i].Move)
+		}
 	}
 	return strings.Join(parts, " ")
 }

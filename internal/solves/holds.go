@@ -26,8 +26,34 @@ type HoldChange struct {
 	Bottom string  `json:"bottom"`
 	Front  string  `json:"front"`
 	Rot    string  `json:"rot"` // y、x'、x y など
-	// WithMove は L・R の回転と同時に起きた x 系の持ち替え（ワイドムーブやスライスの一部かもしれない）。
+	// WithMove は L・R の回転と同時に起きた x 系（ワイドムーブやスライスの一部）。中心ごと向きが変わっただけで、
+	// 解く人は持ち替えていないので、持ち替えの回数と時間には数えない。
 	WithMove bool `json:"with_move"`
+	// Slice は、WithMove のうち L・R の組と合わせてスライスになるもの（M、M'、M2）。SliceMoves はその L・R の手の添字。
+	// 表記では、この手と持ち替えをまとめて SliceMoves[0] の位置に Slice の1語で書く。
+	Slice      string `json:"slice,omitempty"`
+	SliceMoves []int  `json:"slice_moves,omitempty"`
+}
+
+// IsRegrip は解く人が持ち替えたか（ワイドムーブやスライスで中心ごと回ったのではない）。
+func (c HoldChange) IsRegrip() bool { return !c.WithMove }
+
+// Slices はスライスの、最初の手の添字からその持ち替えへの対応と、スライスにまとめる手の添字。
+func (h *Holds) Slices() (at map[int]HoldChange, used map[int]bool) {
+	at, used = map[int]HoldChange{}, map[int]bool{}
+	if h == nil {
+		return at, used
+	}
+	for _, c := range h.Changes {
+		if c.Slice == "" || len(c.SliceMoves) == 0 {
+			continue
+		}
+		at[c.SliceMoves[0]] = c
+		for _, i := range c.SliceMoves {
+			used[i] = true
+		}
+	}
+	return at, used
 }
 
 // Holds はジャイロから計算した、ソルブ中の持ち方の移り変わり。
@@ -60,6 +86,14 @@ func (h *Holds) Validate(moveCount int) error {
 		}
 		if _, err := notation.NewFrame(c.Bottom, c.Front); err != nil {
 			return fmt.Errorf("holds.changes[%d]: %w", i, err)
+		}
+		if (c.Slice == "") != (len(c.SliceMoves) == 0) {
+			return fmt.Errorf("holds.changes[%d]: slice and slice_moves must be set together", i)
+		}
+		for _, m := range c.SliceMoves {
+			if m < 0 || m >= moveCount {
+				return fmt.Errorf("holds.changes[%d]: invalid slice move %d", i, m)
+			}
 		}
 	}
 	return nil

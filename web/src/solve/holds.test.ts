@@ -153,6 +153,48 @@ describe('detectHolds', () => {
   })
 })
 
+describe('slices', () => {
+  // 持ち方での記号を、キューブ自身の向きの手にする
+  const frame = holdFrame('white', 'red')!
+  const cube = (m: string) => Object.keys(frame).find((f) => frame[f] === m[0])! + m.slice(1)
+
+  it('M is R L x on the cube', () => {
+    for (const [slice, alg] of [["M'", "R' L x"], ['M', "R L' x'"], ['M2', 'R2 L2 x2']]) {
+      expect(solved.applyAlg(slice).isIdentical(solved.applyAlg(alg)), slice).toBe(true)
+    }
+  })
+
+  it("writes R' L with an x as M'", () => {
+    const after = applyRotation(START, 'x')
+    const samples = rotateBetween(START, after, 1000, 3000)
+    const ms = moves(30).map((m) => (m.t === 1000 ? { ...m, move: cube("R'") } : m.t === 1100 ? { ...m, move: cube('L') } : m))
+    const res = detectHolds(samples, ms, START)!
+    expect(res.changes).toMatchObject([{ rot: 'x', with_move: true, slice: "M'", slice_moves: [10, 11] }])
+    const text = notationTokens(ms, res, frame, 8, 14).map((t) => t.text)
+    // 回転ログの U は白（下）の面。x のあとは前に来る
+    expect(text).toEqual(['D', 'D', "M'", 'F', 'F'])
+  })
+
+  it('writes R R L L with an x2 as M2', () => {
+    const after = applyRotation(START, 'x2')
+    const samples = rotateBetween(START, after, 1000, 3000)
+    const turn = { 1000: 'R', 1100: 'L', 1200: 'R', 1300: 'L' } as Record<number, string>
+    const ms = moves(30).map((m) => (turn[m.t] ? { ...m, move: cube(turn[m.t]) } : m))
+    const res = detectHolds(samples, ms, START)!
+    expect(res.changes).toMatchObject([{ rot: 'x2', with_move: true, slice: 'M2', slice_moves: [10, 11, 12, 13] }])
+    expect(notationTokens(ms, res, frame, 9, 15).map((t) => t.text)).toEqual(['D', 'M2', 'U'])
+  })
+
+  it('keeps [x] when the L and R do not make a slice', () => {
+    const after = applyRotation(START, 'x')
+    const samples = rotateBetween(START, after, 1000, 3000)
+    const ms = moves(30).map((m) => (m.t === 1100 ? { ...m, move: cube('L') } : m))
+    const c = detectHolds(samples, ms, START)!.changes[0]
+    expect(c).toMatchObject({ rot: 'x', with_move: true })
+    expect(c.slice).toBeUndefined()
+  })
+})
+
 describe('estimateHolds', () => {
   // 解く人の持ち方 hold での記号の列を、キューブ自身の向きの回転ログにする
   const cubeMoves = (hold: Hold, alg: string) => {

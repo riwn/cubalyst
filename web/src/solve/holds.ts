@@ -29,9 +29,21 @@ export type HoldChange = {
   front: Hold['front']
   /** 持ち替えの記号（y、x'、x y など）。 */
   rot: string
-  /** L・R の回転と同時に起きた x 系の持ち替え（ワイドムーブやスライスの一部かもしれない）。 */
+  /**
+   * L・R の回転と同時に起きた x 系（ワイドムーブやスライスの一部）。キューブは中心ごと向きが変わるのでジャイロには x に見えるが、
+   * 解く人は持ち替えていない。持ち替えの回数と時間には数えない。
+   */
   with_move: boolean
+  /** with_move のうち、L・R の組と合わせてスライス（M）になるもの。M' = R' L x、M = R L' x'、M2 = R2 L2 x2。 */
+  slice?: Slice
+  /** slice の L・R の手（回転ログの添字）。表記ではこの手と持ち替えをまとめて slice の1語にする。 */
+  slice_moves?: number[]
 }
+
+export type Slice = 'M' | "M'" | 'M2'
+
+/** 解く人が持ち替えた（ワイドムーブやスライスで中心ごと回ったのではない）か。 */
+export const isRegrip = (c: HoldChange) => !c.with_move
 
 export type Holds = {
   start: Hold
@@ -154,21 +166,63 @@ export function detectHolds(samples: GyroSample[], moves: TimedMove[], start: Ho
     pending = null
   }
 
-  // x 系の持ち替えが L・R と同時なら印を付ける
+  // x 系の持ち替えが L・R と同時なら印を付け、L・R の組と合わせてスライスになるかを見る
   let prev = start
+  const used = new Set<number>()
   for (const c of changes) {
     if (c.rot[0] === 'x' && !c.rot.includes(' ')) {
+      // L・R は x で入れ替わらないので、持ち替え前の持ち方で見ればよい
       const frame = holdFrame(prev.bottom, prev.front)!
-      c.with_move = moves.some(
-        (m) =>
-          m.t >= c.start_t - opts.withMoveMs &&
-          m.t <= c.end_t + opts.withMoveMs &&
-          'LR'.includes(convertMove(frame, m.move)[0]),
+      const mid = (c.start_t + c.end_t) / 2
+      const near = moves
+        .map((m, i) => ({ i, t: m.t, face: convertMove(frame, m.move) }))
+        .filter((m) => m.t >= c.start_t - opts.withMoveMs && m.t <= c.end_t + opts.withMoveMs && 'LR'.includes(m.face[0]))
+      c.with_move = near.length > 0
+      const slice = findSlice(
+        c.rot,
+        near.filter((m) => !used.has(m.i)).sort((a, b) => Math.abs(a.t - mid) - Math.abs(b.t - mid)),
       )
+      if (slice) {
+        c.slice = slice.slice
+        c.slice_moves = slice.moves.sort((a, b) => a - b)
+        for (const i of c.slice_moves) used.add(i)
+      }
     }
     prev = c
   }
   return { start, changes }
+}
+
+/** スライスになる L・R の手の組（M' = R' L x、M = R L' x'、M2 = R2 L2 x2）。near は近い順。 */
+const SLICES: Record<string, { slice: Slice; need: string[][] }> = {
+  x: { slice: "M'", need: [["R'", 'L']] },
+  "x'": { slice: 'M', need: [['R', "L'"]] },
+  x2: {
+    slice: 'M2',
+    need: [
+      ['R', 'R', 'L', 'L'],
+      ['R', 'R', "L'", "L'"],
+      ["R'", "R'", 'L', 'L'],
+      ["R'", "R'", "L'", "L'"],
+    ],
+  },
+}
+
+function findSlice(rot: string, near: { i: number; face: string }[]): { slice: Slice; moves: number[] } | null {
+  const s = SLICES[rot]
+  if (!s) return null
+  for (const need of s.need) {
+    const left = [...near]
+    const moves: number[] = []
+    for (const face of need) {
+      const k = left.findIndex((m) => m.face === face)
+      if (k < 0) break
+      moves.push(left[k].i)
+      left.splice(k, 1)
+    }
+    if (moves.length === need.length) return { slice: s.slice, moves }
+  }
+  return null
 }
 
 /**
@@ -222,10 +276,13 @@ export function holdsByMove(holds: Holds, moveCount: number): Hold[] {
 export type NotationToken =
   | { kind: 'move'; index: number; text: string }
   | { kind: 'rotation'; change: HoldChange; text: string }
+  /** スライス（M）。L・R の組（change.slice_moves）と x 系の持ち替えをまとめた1語。 */
+  | { kind: 'slice'; change: HoldChange; text: string }
 
 /**
  * 回転ログ moves[from, to) を、持ち方での記号の列にする。holds があれば、その時点の持ち方で変換し、
- * 範囲の中の持ち替えを入れる。無ければ fallback（設定の持ち方）で変換する。
+ * 範囲の中の持ち替えを入れる。スライスになる L・R の組と持ち替えは、組の最初の手の位置に M などの1語でまとめる。
+ * 無ければ fallback（設定の持ち方）で変換する。
  */
 export function notationTokens(
   moves: { move: string }[],
@@ -242,10 +299,20 @@ export function notationTokens(
     if (!frames.has(k)) frames.set(k, holdFrame(h.bottom, h.front)!)
     return frames.get(k)!
   }
+  const sliceAt = new Map<number, HoldChange>()
+  const used = new Set<number>()
+  for (const c of holds?.changes ?? []) {
+    if (!c.slice || !c.slice_moves?.length) continue
+    sliceAt.set(c.slice_moves[0], c)
+    for (const i of c.slice_moves) used.add(i)
+  }
   for (let i = from; i < to; i++) {
     for (const c of holds?.changes ?? []) {
-      if (c.index === i) out.push({ kind: 'rotation', change: c, text: c.rot })
+      if (c.index === i && !c.slice) out.push({ kind: 'rotation', change: c, text: c.rot })
     }
+    const slice = sliceAt.get(i)
+    if (slice) out.push({ kind: 'slice', change: slice, text: slice.slice! })
+    if (used.has(i)) continue
     out.push({ kind: 'move', index: i, text: convertMove(byMove ? frameOf(byMove[i]) : fallback, moves[i].move) })
   }
   return out
