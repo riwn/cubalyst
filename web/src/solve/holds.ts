@@ -50,6 +50,11 @@ export type Holds = {
   changes: HoldChange[]
   /** 着手時の前の色を、回した手の偏りから決めた（無ければ設定の前の色を仮定した）。 */
   estimated?: boolean
+  /**
+   * 持ち替えを記録し始めた時刻（ms）。着手の時点で傾けていたら、下が設定の色で落ち着いたところから記録する。
+   * それより前の手は start の持ち方で書く。無ければ着手の時点から。
+   */
+  from_t?: number
 }
 
 export const HOLD_OPTIONS = {
@@ -111,8 +116,9 @@ export function rotationName(from: Hold, to: Hold): string {
 // --- 検出 ---
 
 /**
- * ジャイロのサンプルから持ち替えを検出する。持ち方が決められないとき（サンプルが無い・途切れている、
- * 着手の時点の下の色が設定と違う）は null（持ち替えの記録なし）。
+ * ジャイロのサンプルから持ち替えを検出する。基準は、着手の時点（最初の手の直前）か、そこで傾けていたら
+ * そのあと下が start の色で落ち着いた最初のサンプル（クロスでは傾けて見ていることが多い）。
+ * 持ち方が決められないとき（サンプルが無い・途切れている、下が start の色で落ち着かない）は null（持ち替えの記録なし）。
  * samples と moves の t は、どちらもソルブ開始からの相対ms。
  */
 export function detectHolds(samples: GyroSample[], moves: TimedMove[], start: Hold, opts = HOLD_OPTIONS): Holds | null {
@@ -129,17 +135,16 @@ export function detectHolds(samples: GyroSample[], moves: TimedMove[], start: Ho
   }
   if (samples[samples.length - 1][0] < end - opts.maxGapMs) return null
 
-  const q0 = sampleQuat(samples[a])
-  const up0 = nearestColor(toBody(q0, [0, 0, 1]))
-  if (OPPOSITE[up0.color] !== start.bottom || up0.deg > opts.maxDeg) return null
-  const frontWorld = horizontal(toWorld(q0, COLOR_AXIS[start.front]))
+  const b = anchorIndex(samples, a, end, start.bottom, opts)
+  if (b < 0) return null
+  const frontWorld = horizontal(toWorld(sampleQuat(samples[b]), COLOR_AXIS[start.front]))
   if (!frontWorld) return null
 
   const changes: HoldChange[] = []
   let current = start
-  let lastStable = samples[a][0]
+  let lastStable = samples[b][0]
   let pending: { hold: Hold; count: number; firstT: number } | null = null
-  for (let i = a + 1; i < samples.length && samples[i][0] <= end; i++) {
+  for (let i = b + 1; i < samples.length && samples[i][0] <= end; i++) {
     const t = samples[i][0]
     const h = holdAt(sampleQuat(samples[i]), frontWorld, opts.maxDeg)
     if (!h) continue // 回している途中
@@ -190,7 +195,25 @@ export function detectHolds(samples: GyroSample[], moves: TimedMove[], start: Ho
     }
     prev = c
   }
-  return { start, changes }
+  return b > a ? { start, changes, from_t: Math.round(samples[b][0]) } : { start, changes }
+}
+
+/**
+ * 基準にするサンプル：a（着手の直前）で下が bottom の色なら a。傾けていたら、そのあと下が bottom の色で
+ * confirmSamples 回続いた最初のサンプル。end までに無ければ -1。
+ */
+function anchorIndex(samples: GyroSample[], a: number, end: number, bottom: Color, opts = HOLD_OPTIONS): number {
+  const level = (i: number) => {
+    const up = nearestColor(toBody(sampleQuat(samples[i]), [0, 0, 1]))
+    return OPPOSITE[up.color] === bottom && up.deg <= opts.maxDeg
+  }
+  if (level(a)) return a
+  let run = 0
+  for (let i = a + 1; i < samples.length && samples[i][0] <= end; i++) {
+    run = level(i) ? run + 1 : 0
+    if (run >= opts.confirmSamples) return i - run + 1
+  }
+  return -1
 }
 
 /** スライスになる L・R の手の組（M' = R' L x、M = R L' x'、M2 = R2 L2 x2）。near は近い順。 */

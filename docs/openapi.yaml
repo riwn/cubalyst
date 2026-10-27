@@ -651,6 +651,7 @@ components:
       properties:
         start: { $ref: "#/components/schemas/Hold" }
         estimated: { type: boolean, description: 着手時の前の色を、回した手の偏り（R が多く B が少ない向き）から推定したか。false なら設定の前の色を仮定した }
+        from_t: { type: number, description: 持ち替えを記録し始めた時刻（ソルブ開始からの相対ミリ秒）。着手の時点で傾けていたら、下が設定の色で落ち着いたところから。無ければ着手の時点から }
         changes:
           type: array
           items:

@@ -146,6 +146,12 @@ func TestSolveInputWithHolds(t *testing.T) {
 	if in := SolveInput(s, nil, st); !strings.Contains(in, "途中で途切れたため、持ち替えは記録なし") {
 		t.Errorf("gyro without holds:\n%s", in)
 	}
+	// 着手時に傾けていたら、どこから記録したかを書く
+	s = withHolds(fullSolve(10, 1))
+	s.Holds.FromT = 2500
+	if in := SolveInput(s, nil, st); !strings.Contains(in, "持ち替えは下の色が落ち着いた 2.50秒から記録") {
+		t.Errorf("from_t:\n%s", in)
+	}
 	// ワイドムーブかもしれない x は括弧で囲む
 	s = withHolds(fullSolve(9, 1))
 	s.Holds.Changes[0].Rot, s.Holds.Changes[0].Front, s.Holds.Changes[0].WithMove = "x", "white", true

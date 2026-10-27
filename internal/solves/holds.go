@@ -62,6 +62,9 @@ type Holds struct {
 	Changes []HoldChange `json:"changes"`
 	// Estimated は、着手時の前の色を回した手の偏りから決めたか（false なら設定の前の色を仮定した）。
 	Estimated bool `json:"estimated,omitempty"`
+	// FromT は、持ち替えを記録し始めた時刻（ms）。着手の時点で傾けていたら、下が start の色で落ち着いたところから。
+	// それより前の手は start の持ち方で書く。0 なら着手の時点から。
+	FromT float64 `json:"from_t,omitempty"`
 }
 
 // Validate は持ち替えの値を検証する。moveCount は回転ログの手数。
@@ -71,6 +74,9 @@ func (h *Holds) Validate(moveCount int) error {
 	}
 	if _, err := notation.NewFrame(h.Start.Bottom, h.Start.Front); err != nil {
 		return fmt.Errorf("holds.start: %w", err)
+	}
+	if h.FromT < 0 {
+		return fmt.Errorf("holds.from_t: negative")
 	}
 	prev := 0
 	for i, c := range h.Changes {

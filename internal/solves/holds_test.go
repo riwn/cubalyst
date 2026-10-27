@@ -87,6 +87,7 @@ func TestHoldsValidate(t *testing.T) {
 		}},
 		"empty rot": {Start: ok, Changes: []HoldChange{{Index: 1, Bottom: "white", Front: "green"}}},
 		"end first": {Start: ok, Changes: []HoldChange{{Index: 1, StartT: 10, EndT: 5, Bottom: "white", Front: "green", Rot: "y"}}},
+		"from_t":    {Start: ok, FromT: -1},
 	}
 	for name, h := range cases {
 		if err := h.Validate(2); err == nil {

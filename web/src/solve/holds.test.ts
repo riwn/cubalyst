@@ -135,6 +135,27 @@ describe('detectHolds', () => {
     expect(detectHolds(samples, moves(30), START)).toBeNull()
   })
 
+  it('starts where the bottom settles when tilted at the first move', () => {
+    // クロスでは傾けて見ていることが多い。着手から 1 秒は 45° 傾け、下が白で落ち着いてから y' する
+    const qa = quatFromHold(START, 0.3)
+    const tilted = slerp(qa, quatFromHold(applyRotation(START, 'x'), 0.3), 0.5)
+    const qb = quatFromHold(applyRotation(START, "y'"), 0.3)
+    const samples = hold((t) => (t < 1000 ? tilted : t < 2000 ? qa : qb), -500, 3000)
+    const res = detectHolds(samples, moves(30), START)!
+    expect(res.from_t).toBe(1030)
+    expect(res.changes).toMatchObject([{ rot: "y'" }])
+  })
+
+  it('does not set from_t when level at the first move', () => {
+    const samples = rotateBetween(START, START, 0, 3000)
+    expect(detectHolds(samples, moves(30), START)?.from_t).toBeUndefined()
+  })
+
+  it('gives up when the bottom never settles on the setting', () => {
+    const samples = rotateBetween({ bottom: 'blue', front: 'red' }, { bottom: 'blue', front: 'red' }, 0, 3000)
+    expect(detectHolds(samples, moves(30), START)).toBeNull()
+  })
+
   it('gives up without samples before the first move', () => {
     const samples = rotateBetween(START, START, 0, 3000).filter((s) => s[0] > 0)
     expect(detectHolds(samples, moves(30), START)).toBeNull()

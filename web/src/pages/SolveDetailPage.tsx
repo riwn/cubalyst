@@ -172,6 +172,8 @@ function HoldsNote({ solve }: { solve: Solve }) {
       <p className="muted small">
         ジャイロで記録した持ち替え {n}回（着手時：下が{COLOR_LABELS[h.start.bottom]}・前が{COLOR_LABELS[h.start.front]}。
         {h.estimated ? '前の色は回した手から推定' : '前の色は設定のまま。回した手からは決められませんでした'}）。
+        {h.from_t != null &&
+          `着手時は傾けていたので、持ち替えは下の色が落ち着いた ${(h.from_t / 1000).toFixed(1)}秒から記録しています。`}
         {slices > 0 && `スライス（M）${slices}回は、持ち替えではなく手として書いています。`}
         解法はその時点の持ち方の記号です。
       </p>
@@ -180,7 +182,7 @@ function HoldsNote({ solve }: { solve: Solve }) {
   if (solve.gyro?.length) {
     return (
       <p className="muted small">
-        持ち替えの記録なし（ジャイロのデータはありますが、着手時の下の色が設定と違うか、途中で途切れたため、持ち方を決められませんでした）
+        持ち替えの記録なし（ジャイロのデータはありますが、下が設定の色で落ち着かなかったか、途中で途切れたため、持ち方を決められませんでした）
       </p>
     )
   }

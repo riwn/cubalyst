@@ -110,11 +110,14 @@ func holdsLine(s solves.Solve, holdDescription string) string {
 		if s.Holds.Estimated {
 			front = "前の色は回した手の偏りから推定"
 		}
+		if s.Holds.FromT > 0 {
+			front += fmt.Sprintf("。着手時は傾けていたので、持ち替えは下の色が落ち着いた %s秒から記録（それより前の手は着手時の持ち方で書いている）", sec(s.Holds.FromT))
+		}
 		n := len(regripsIn(s, 0, len(s.Moves)+1))
 		return fmt.Sprintf("ジャイロで記録（着手時：%s。%s）。手の記号は、その時点の持ち方での面の名前です。持ち替えは %d 回",
 			holdDescriptionOf(s.Holds.Start), front, n)
 	case len(s.Gyro) > 0:
-		return holdDescription + "（固定）。ジャイロのデータはあるが、着手時の下の色が設定と違うか途中で途切れたため、持ち替えは記録なし"
+		return holdDescription + "（固定）。ジャイロのデータはあるが、下の色が設定の色で落ち着かなかったか途中で途切れたため、持ち替えは記録なし"
 	default:
 		return holdDescription + "（固定）。ジャイロを使っていないため、持ち替えは記録なし"
 	}
