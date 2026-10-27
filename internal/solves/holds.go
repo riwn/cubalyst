@@ -62,7 +62,7 @@ type Holds struct {
 	Changes []HoldChange `json:"changes"`
 	// Estimated は、着手時の前の色を回した手の偏りから決めたか（false なら設定の前の色を仮定した）。
 	Estimated bool `json:"estimated,omitempty"`
-	// FromT は、持ち替えを記録し始めた時刻（ms）。着手の時点で傾けていたら、下が start の色で落ち着いたところから。
+	// FromT は、持ち替えを記録し始めた時刻（ms）。着手の時点で傾けていたら、持ち方が落ち着いたところから。
 	// それより前の手は start の持ち方で書く。0 なら着手の時点から。
 	FromT float64 `json:"from_t,omitempty"`
 }

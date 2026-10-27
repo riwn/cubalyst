@@ -117,7 +117,7 @@ func holdsLine(s solves.Solve, holdDescription string) string {
 		return fmt.Sprintf("ジャイロで記録（着手時：%s。%s）。手の記号は、その時点の持ち方での面の名前です。持ち替えは %d 回",
 			holdDescriptionOf(s.Holds.Start), front, n)
 	case len(s.Gyro) > 0:
-		return holdDescription + "（固定）。ジャイロのデータはあるが、下の色が設定の色で落ち着かなかったか途中で途切れたため、持ち替えは記録なし"
+		return holdDescription + "（固定）。ジャイロのデータはあるが、持ち方が落ち着かなかったか途中で途切れたため、持ち替えは記録なし"
 	default:
 		return holdDescription + "（固定）。ジャイロを使っていないため、持ち替えは記録なし"
 	}

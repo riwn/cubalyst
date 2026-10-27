@@ -244,6 +244,29 @@ describe('estimateHolds', () => {
     expect(estimateHolds(samples, ms, START)).toMatchObject({ start: actual, estimated: true })
   })
 
+  it('starts from the bottom the cube was really held with', () => {
+    // 白を下にしたつもりで上にしていた。下黄・前青で解き、途中で z2 して下白にする
+    const actual: Hold = { bottom: 'yellow', front: 'blue' }
+    const after = applyRotation(actual, 'z2')
+    const ms = [...cubeMoves(actual, sexy), ...cubeMoves(after, sexy).map((m) => ({ ...m, t: m.t + 4000 }))]
+    const samples = rotateBetween(actual, after, 3500, 7500)
+    const res = estimateHolds(samples, ms, START)!
+    expect(res).toMatchObject({ start: actual, estimated: true })
+    expect(res.changes).toMatchObject([{ rot: 'z2', bottom: 'white', front: 'blue' }])
+  })
+
+  it('prefers the setting bottom when it settles soon', () => {
+    // クロスで白を手前へ傾けて見ていて、少しの間は下が橙に近い。そのあと下白に落ち着く
+    const qa = quatFromHold(START, 0.3)
+    const facing = quatFromHold(applyRotation(START, "x'"), 0.3)
+    const tilted = slerp(qa, facing, 0.5)
+    const samples = hold((t) => (t < 0 ? tilted : t < 1000 ? facing : qa), -500, 4000)
+    const ms = cubeMoves(START, `${sexy} F R U R' U' F'`)
+    const res = estimateHolds(samples, ms, START)!
+    expect(res.start.bottom).toBe('white')
+    expect(res.from_t).toBe(1030)
+  })
+
   it('keeps the setting when the moves do not tell', () => {
     const ms = cubeMoves(START, 'U U U')
     const samples = rotateBetween(START, START, 0, 1000)

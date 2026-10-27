@@ -182,7 +182,7 @@ function HoldsNote({ solve }: { solve: Solve }) {
   if (solve.gyro?.length) {
     return (
       <p className="muted small">
-        持ち替えの記録なし（ジャイロのデータはありますが、下が設定の色で落ち着かなかったか、途中で途切れたため、持ち方を決められませんでした）
+        持ち替えの記録なし（ジャイロのデータはありますが、持ち方が落ち着かなかったか、途中で途切れたため、持ち方を決められませんでした）
       </p>
     )
   }

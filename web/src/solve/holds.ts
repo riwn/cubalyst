@@ -1,7 +1,7 @@
 // 持ち替え（持ち方の移り変わり）の検出と、持ち方に合わせた解法の表記。
 //
 // ジャイロのサンプルから、ソルブ中の持ち方（下の色・前の色）を出し、変わったところを持ち替え（y・x・z）として記録する。
-// 下の色は重力から決まる。前の色は、着手の時点で設定の前の色だと仮定する（docs/plans/phase-9.md）。
+// 下の色は重力から決まる。前の色は、回した手の偏りから推定する（決められなければ設定の前の色。docs/plans/phase-9.md）。
 
 import {
   COLOR_AXIS,
@@ -51,7 +51,7 @@ export type Holds = {
   /** 着手時の前の色を、回した手の偏りから決めた（無ければ設定の前の色を仮定した）。 */
   estimated?: boolean
   /**
-   * 持ち替えを記録し始めた時刻（ms）。着手の時点で傾けていたら、下が設定の色で落ち着いたところから記録する。
+   * 持ち替えを記録し始めた時刻（ms）。着手の時点で傾けていたら、持ち方が落ち着いたところから記録する。
    * それより前の手は start の持ち方で書く。無ければ着手の時点から。
    */
   from_t?: number
@@ -69,6 +69,11 @@ export const HOLD_OPTIONS = {
   maxGapMs: 3000,
   /** x 系の持ち替えと L・R の回転がこれ以内なら with_move とする（ms）。 */
   withMoveMs: 150,
+  /**
+   * 着手の時点で傾けていたとき、これ以内（着手からの ms）に下が設定の色で落ち着けば、そこを基準にする。
+   * 落ち着かなければ（白を下にしたつもりで上にしていた、など）、最初に落ち着いた下の色を基準にする。
+   */
+  preferBottomMs: 15000,
   /** 着手時の前の色を推定するとき、点数（2×R ＋ F − 3×B）が2番目の候補よりこれだけ多ければ採る。 */
   estimateMargin: 3,
 }
@@ -116,16 +121,22 @@ export function rotationName(from: Hold, to: Hold): string {
 // --- 検出 ---
 
 /**
- * ジャイロのサンプルから持ち替えを検出する。基準は、着手の時点（最初の手の直前）か、そこで傾けていたら
- * そのあと下が start の色で落ち着いた最初のサンプル（クロスでは傾けて見ていることが多い）。
- * 持ち方が決められないとき（サンプルが無い・途切れている、下が start の色で落ち着かない）は null（持ち替えの記録なし）。
- * samples と moves の t は、どちらもソルブ開始からの相対ms。
+ * 基準にするサンプル。下の色は重力から決まる。
+ * 1. 着手の時点（最初の手の直前）で落ち着いていれば、そこ
+ * 2. 傾けていたら（クロスでは傾けて見ていることが多い）、着手から preferBottomMs 以内に下が prefer の色で
+ *    confirmSamples 回続けて落ち着いた最初のサンプル
+ * 3. それも無ければ、同じ下の色で confirmSamples 回続けて落ち着いた最初のサンプル
+ * 決められないとき（サンプルが無い・途切れている・落ち着かない）は null。
  */
-export function detectHolds(samples: GyroSample[], moves: TimedMove[], start: Hold, opts = HOLD_OPTIONS): Holds | null {
+export function holdAnchor(
+  samples: GyroSample[],
+  moves: TimedMove[],
+  prefer: Color,
+  opts = HOLD_OPTIONS,
+): { a: number; b: number; bottom: Color } | null {
   if (samples.length === 0 || moves.length === 0) return null
   const t0 = moves[0].t
   const end = moves[moves.length - 1].t
-  // 基準：着手の時点（最初の手）の直前のサンプル
   let a = -1
   for (let i = 0; i < samples.length && samples[i][0] <= t0; i++) a = i
   if (a < 0) return null
@@ -135,8 +146,37 @@ export function detectHolds(samples: GyroSample[], moves: TimedMove[], start: Ho
   }
   if (samples[samples.length - 1][0] < end - opts.maxGapMs) return null
 
-  const b = anchorIndex(samples, a, end, start.bottom, opts)
-  if (b < 0) return null
+  const bottomAt = (i: number) => {
+    const up = nearestColor(toBody(sampleQuat(samples[i]), [0, 0, 1]))
+    return up.deg <= opts.maxDeg ? OPPOSITE[up.color] : null
+  }
+  const first = bottomAt(a)
+  if (first) return { a, b: a, bottom: first }
+  const settled = (until: number, want?: Color) => {
+    let run = 0
+    let prev: Color | null = null
+    for (let i = a + 1; i < samples.length && samples[i][0] <= until; i++) {
+      const bottom = bottomAt(i)
+      const ok = bottom && (!want || bottom === want)
+      run = ok && bottom === prev ? run + 1 : ok ? 1 : 0
+      prev = ok ? bottom : null
+      if (ok && run >= opts.confirmSamples) return { a, b: i - run + 1, bottom }
+    }
+    return null
+  }
+  return settled(Math.min(end, t0 + opts.preferBottomMs), prefer) ?? settled(end)
+}
+
+/**
+ * ジャイロのサンプルから持ち替えを検出する。基準のサンプル（holdAnchor）で start の持ち方だったとする。
+ * 持ち方が決められないとき（基準が無い、基準の下の色が start と違う）は null（持ち替えの記録なし）。
+ * samples と moves の t は、どちらもソルブ開始からの相対ms。
+ */
+export function detectHolds(samples: GyroSample[], moves: TimedMove[], start: Hold, opts = HOLD_OPTIONS): Holds | null {
+  const anchor = holdAnchor(samples, moves, start.bottom, opts)
+  if (!anchor || anchor.bottom !== start.bottom) return null
+  const { a, b } = anchor
+  const end = moves[moves.length - 1].t
   const frontWorld = horizontal(toWorld(sampleQuat(samples[b]), COLOR_AXIS[start.front]))
   if (!frontWorld) return null
 
@@ -198,24 +238,6 @@ export function detectHolds(samples: GyroSample[], moves: TimedMove[], start: Ho
   return b > a ? { start, changes, from_t: Math.round(samples[b][0]) } : { start, changes }
 }
 
-/**
- * 基準にするサンプル：a（着手の直前）で下が bottom の色なら a。傾けていたら、そのあと下が bottom の色で
- * confirmSamples 回続いた最初のサンプル。end までに無ければ -1。
- */
-function anchorIndex(samples: GyroSample[], a: number, end: number, bottom: Color, opts = HOLD_OPTIONS): number {
-  const level = (i: number) => {
-    const up = nearestColor(toBody(sampleQuat(samples[i]), [0, 0, 1]))
-    return OPPOSITE[up.color] === bottom && up.deg <= opts.maxDeg
-  }
-  if (level(a)) return a
-  let run = 0
-  for (let i = a + 1; i < samples.length && samples[i][0] <= end; i++) {
-    run = level(i) ? run + 1 : 0
-    if (run >= opts.confirmSamples) return i - run + 1
-  }
-  return -1
-}
-
 /** スライスになる L・R の手の組（M' = R' L x、M = R L' x'、M2 = R2 L2 x2）。near は近い順。 */
 const SLICES: Record<string, { slice: Slice; need: string[][] }> = {
   x: { slice: "M'", need: [["R'", 'L']] },
@@ -249,20 +271,24 @@ function findSlice(rot: string, near: { i: number; face: string }[]): { slice: S
 }
 
 /**
- * detectHolds の、着手時の前の色を推定する版。ジャイロでは水平の向きが分からないので、下の色が setting と同じ
+ * detectHolds の、着手時の持ち方を決める版。下の色は基準のサンプル（holdAnchor）の重力から決める（着手の時点で傾けていたら
+ * 設定の下の色を優先するが、しばらく落ち着かなければ違う色でもよい。白を下にしたつもりで上にしていた、など）。前の色はジャイロでは水平の向きが分からないので、その下の色での
  * 4通りの前の色で持ち替えを計算し、持ち方の記号の数で「2×R ＋ F − 3×B」が一番多いものを採る（CFOP では R をよく回し、
  * F は OLL・PLL で回すが、B はほとんど回さない）。B だけだと、R・U だけの手順で前と横の区別が付かない。
  * R − B だけだと、左のスロット（L）をよく使って F・B が少ないソルブで、前と後ろ（R と L、F と B が入れ替わる）が同点になる。
  * R と F が同じ重みだと、R ばかりの手順で前と横（R が F になる向き）が同点になるので、R を重くする。
- * 差が estimateMargin に届かなければ（手が少ないなど）、setting の前の色のまま。
+ * 差が estimateMargin に届かなければ（手が少ないなど）、下の色が setting と同じなら setting の前の色のまま、違えば null。
  */
 export function estimateHolds(samples: GyroSample[], moves: TimedMove[], setting: Hold, opts = HOLD_OPTIONS): Holds | null {
-  const base = detectHolds(samples, moves, setting, opts)
-  if (!base) return null
+  const anchor = holdAnchor(samples, moves, setting.bottom, opts)
+  if (!anchor) return null
+  const bottom = anchor.bottom
+  const base = bottom === setting.bottom ? detectHolds(samples, moves, setting, opts) : null
   const scored = (Object.keys(COLOR_AXIS) as Color[])
-    .filter((front) => isValidHold(setting.bottom, front))
+    .filter((front) => isValidHold(bottom, front))
     .map((front) => {
-      const holds = front === setting.front ? base : detectHolds(samples, moves, { bottom: setting.bottom, front }, opts)
+      const holds =
+        base && front === setting.front ? base : detectHolds(samples, moves, { bottom, front }, opts)
       return { holds, score: holds ? frontScore(moves, holds) : -Infinity }
     })
     .sort((a, b) => b.score - a.score || (a.holds === base ? -1 : b.holds === base ? 1 : 0))
