@@ -235,6 +235,15 @@ describe('estimateHolds', () => {
     expect(notationTokens(ms, res, holdFrame('white', 'red')!).map((t) => t.text).slice(0, 4)).toEqual(['R', 'U', "R'", "U'"])
   })
 
+  it('tells the front from the back when R and L are even', () => {
+    // 左のスロットもよく使うと R と L が同じくらいになり、R − B だけでは前と後ろが同点になる。F で分ける
+    const actual: Hold = { bottom: 'white', front: 'orange' }
+    const lefty = Array(8).fill("L' U' L U").join(' ')
+    const ms = cubeMoves(actual, `${sexy} ${lefty} F R U R' U' F'`)
+    const samples = rotateBetween(actual, actual, 0, 7000)
+    expect(estimateHolds(samples, ms, START)).toMatchObject({ start: actual, estimated: true })
+  })
+
   it('keeps the setting when the moves do not tell', () => {
     const ms = cubeMoves(START, 'U U U')
     const samples = rotateBetween(START, START, 0, 1000)

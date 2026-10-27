@@ -69,7 +69,7 @@ export const HOLD_OPTIONS = {
   maxGapMs: 3000,
   /** x 系の持ち替えと L・R の回転がこれ以内なら with_move とする（ms）。 */
   withMoveMs: 150,
-  /** 着手時の前の色を推定するとき、点数（R の数 − B の数）が2番目の候補よりこれだけ多ければ採る。 */
+  /** 着手時の前の色を推定するとき、点数（2×R ＋ F − 3×B）が2番目の候補よりこれだけ多ければ採る。 */
   estimateMargin: 3,
 }
 
@@ -250,8 +250,10 @@ function findSlice(rot: string, near: { i: number; face: string }[]): { slice: S
 
 /**
  * detectHolds の、着手時の前の色を推定する版。ジャイロでは水平の向きが分からないので、下の色が setting と同じ
- * 4通りの前の色で持ち替えを計算し、持ち方の記号で「R の数 − B の数」が一番多いものを採る（CFOP では R をよく回し、
- * B はほとんど回さない。B だけだと、R・U だけの手順で前と横の区別が付かない）。
+ * 4通りの前の色で持ち替えを計算し、持ち方の記号の数で「2×R ＋ F − 3×B」が一番多いものを採る（CFOP では R をよく回し、
+ * F は OLL・PLL で回すが、B はほとんど回さない）。B だけだと、R・U だけの手順で前と横の区別が付かない。
+ * R − B だけだと、左のスロット（L）をよく使って F・B が少ないソルブで、前と後ろ（R と L、F と B が入れ替わる）が同点になる。
+ * R と F が同じ重みだと、R ばかりの手順で前と横（R が F になる向き）が同点になるので、R を重くする。
  * 差が estimateMargin に届かなければ（手が少ないなど）、setting の前の色のまま。
  */
 export function estimateHolds(samples: GyroSample[], moves: TimedMove[], setting: Hold, opts = HOLD_OPTIONS): Holds | null {
@@ -269,14 +271,15 @@ export function estimateHolds(samples: GyroSample[], moves: TimedMove[], setting
   return { ...best.holds, estimated: true }
 }
 
-/** 持ち方 holds での記号の「R の数 − B の数」。 */
+/** 持ち方 holds での記号の数の「2×R ＋ F − 3×B」。 */
 function frontScore(moves: TimedMove[], holds: Holds): number {
   const byMove = holdsByMove(holds, moves.length)
   let score = 0
   moves.forEach((m, i) => {
     const face = convertMove(holdFrame(byMove[i].bottom, byMove[i].front)!, m.move)[0]
-    if (face === 'R') score++
-    if (face === 'B') score--
+    if (face === 'R') score += 2
+    if (face === 'F') score++
+    if (face === 'B') score -= 3
   })
   return score
 }
