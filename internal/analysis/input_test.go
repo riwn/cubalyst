@@ -112,3 +112,67 @@ func TestSolveInputConvertsToHoldFrame(t *testing.T) {
 		t.Errorf("moves should be converted\n%s", in)
 	}
 }
+
+// withHolds は fullSolve に、F2L 2 の認識中（1400〜1650ms）の y の持ち替えを足す。
+// 着手時は黄を下・緑を前（キューブ自身の向き）で、y のあとは前が赤になる。
+func withHolds(s solves.Solve) solves.Solve {
+	s.Gyro = []solves.GyroSample{{-100, 1, 0, 0, 0}}
+	s.Holds = &solves.Holds{
+		Start:   solves.Hold{Bottom: "yellow", Front: "green"},
+		Changes: []solves.HoldChange{{Index: 8, StartT: 1400, EndT: 1650, Bottom: "yellow", Front: "red", Rot: "y"}},
+	}
+	return s
+}
+
+func TestSolveInputWithHolds(t *testing.T) {
+	st := settings.Settings{CrossColor: "white", HoldBottom: "white", HoldFront: "red"}
+	in := SolveInput(withHolds(fullSolve(7, 1)), nil, st)
+	for _, want := range []string{
+		"ジャイロで記録（着手時：下が黄・前が緑）", "持ち替えは 1 回",
+		"| 段階 | 所要 | 認識 | うち持ち替え |",
+		// F2L 2：認識 0.50 のうち持ち替え 0.25。y のあとは赤が前なので、キューブの R は F
+		"| F2L 2 | 0.80 | 0.50 | 0.25 | 0.30 | 4 | 13.33 | 1回（0.25秒） | y F U F' U' |",
+		"| F2L 1 | 0.80 | 0.50 | 0.00 | 0.30 | 4 | 13.33 | 0回（0.00秒） | R U R' U' |",
+		"y の持ち替え 0.25秒を含む",
+	} {
+		if !strings.Contains(in, want) {
+			t.Errorf("missing %q in:\n%s", want, in)
+		}
+	}
+
+	// ジャイロのデータはあるが持ち替えを決められなかったソルブ
+	s := fullSolve(8, 1)
+	s.Gyro = []solves.GyroSample{{0, 1, 0, 0, 0}}
+	if in := SolveInput(s, nil, st); !strings.Contains(in, "途中で途切れたため、持ち替えは記録なし") {
+		t.Errorf("gyro without holds:\n%s", in)
+	}
+	// ワイドムーブかもしれない x は括弧で囲む
+	s = withHolds(fullSolve(9, 1))
+	s.Holds.Changes[0].Rot, s.Holds.Changes[0].Front, s.Holds.Changes[0].WithMove = "x", "white", true
+	if in := SolveInput(s, nil, st); !strings.Contains(in, "[x]") {
+		t.Errorf("with_move:\n%s", in)
+	}
+}
+
+func TestMultiInputWithHolds(t *testing.T) {
+	st := settings.Settings{CrossColor: "white", HoldBottom: "yellow", HoldFront: "green"}
+	var list []solves.Solve
+	for i := int64(1); i <= 4; i++ {
+		list = append(list, withHolds(fullSolve(i, 1)))
+	}
+	list = append(list, fullSolve(5, 1))
+	if in := MultiInput(list, "t", st); !strings.Contains(in, "5件中4件") || !strings.Contains(in, "持ち替えの数字は出していません") {
+		t.Errorf("too few:\n%s", in)
+	}
+	list = append(list, withHolds(fullSolve(6, 1)))
+	in := MultiInput(list, "t", st)
+	for _, want := range []string{"6件中5件", "1ソルブあたり: 1.0回、0.25秒（うち段階の最初の手より前＝認識中 0.25秒）", "| F2L 2 | 1.00 | 0.25 | 0.25 |", "多い持ち替え: y 5回"} {
+		if !strings.Contains(in, want) {
+			t.Errorf("missing %q in:\n%s", want, in)
+		}
+	}
+	// ジャイロを使ったことがなければ、持ち替えの節は出さない
+	if in := MultiInput([]solves.Solve{fullSolve(1, 1)}, "t", st); strings.Contains(in, "持ち替え（ジャイロで記録）") {
+		t.Errorf("no gyro:\n%s", in)
+	}
+}

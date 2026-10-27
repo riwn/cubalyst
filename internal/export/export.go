@@ -142,13 +142,27 @@ func WriteText(w io.Writer, list []solves.Solve, loc *time.Location, frame notat
 }
 
 // WithFrame は回転ログの記号を持ち方での記号に変換したコピーを返す（スクランブルは変えない）。
+// 持ち替えの記録があれば、各手をその時点の持ち方で変換し、frame（設定の持ち方）は使わない。
 func WithFrame(s solves.Solve, frame notation.Frame) solves.Solve {
-	if frame == nil {
+	if frame == nil && s.Holds == nil {
 		return s
 	}
+	frames := map[solves.Hold]notation.Frame{}
 	moves := make([]solves.Move, len(s.Moves))
 	for i, m := range s.Moves {
-		m.Move = frame.Move(m.Move)
+		f := frame
+		if s.Holds != nil {
+			h := s.Holds.HoldAt(i)
+			if frames[h] == nil {
+				if fr, err := notation.NewFrame(h.Bottom, h.Front); err == nil {
+					frames[h] = fr
+				} else {
+					frames[h] = notation.Identity
+				}
+			}
+			f = frames[h]
+		}
+		m.Move = f.Move(m.Move)
 		moves[i] = m
 	}
 	s.Moves = moves
@@ -177,12 +191,12 @@ func Reconstruction(s solves.Solve, loc *time.Location) string {
 	if len(s.Splits) > 0 {
 		b.WriteString("\n")
 		for _, sp := range s.Splits {
-			moves := movesIn(s.Moves, sp.StartIndex, sp.EndIndex)
+			moves := movesIn(s, sp.StartIndex, sp.EndIndex)
 			fmt.Fprintf(&b, "%-6s %s  // %s, %d moves\n", stageLabels[sp.Stage]+":", orDash(moves),
 				FormatTime(sp.EndMS-sp.StartMS), sp.MoveCount)
 		}
 	} else if len(s.Moves) > 0 {
-		fmt.Fprintf(&b, "\nSolution: %s\n", movesIn(s.Moves, 0, len(s.Moves)))
+		fmt.Fprintf(&b, "\nSolution: %s\n", movesIn(s, 0, len(s.Moves)))
 	}
 	n := len(s.Moves)
 	tps := 0.0
@@ -196,7 +210,9 @@ func Reconstruction(s solves.Solve, loc *time.Location) string {
 	return b.String()
 }
 
-func movesIn(moves []solves.Move, from, to int) string {
+// movesIn は回転ログの [from, to) の手を並べる。持ち替えの記録があれば、その位置に入れる。
+func movesIn(s solves.Solve, from, to int) string {
+	moves := s.Moves
 	if from < 0 {
 		from = 0
 	}
@@ -204,8 +220,15 @@ func movesIn(moves []solves.Move, from, to int) string {
 		to = len(moves)
 	}
 	parts := make([]string, 0, to-from)
-	for _, m := range moves[from:to] {
-		parts = append(parts, m.Move)
+	for i := from; i < to; i++ {
+		if s.Holds != nil {
+			for _, c := range s.Holds.Changes {
+				if c.Index == i {
+					parts = append(parts, c.Rot)
+				}
+			}
+		}
+		parts = append(parts, moves[i].Move)
 	}
 	return strings.Join(parts, " ")
 }

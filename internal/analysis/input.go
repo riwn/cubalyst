@@ -19,7 +19,8 @@ const SystemPrompt = `あなたはルービックキューブ（3x3、CFOP法）
 - 時間はすべて秒。回転ログはキューブが報告した90度回転の列で、180度回転（R2）は同じ面の2手（R R）として数えています
 - 解法・回転の記号は、解く人の持ち方（入力に記載）での面の名前に変換済みです。スクランブルだけはWCAの向き（白上・緑前）です
 - 「認識」はその段階の最初の手までの待ち時間（直前の段階の終わりから）、「実行」は最初の手から段階完了までです
-- 持ち替え（y回転など）はスマートキューブでは検出できないため、長い「間」として現れることがあります
+- 持ち替え（y・x・z）は、ジャイロの記録があるソルブ（入力に記載）では解法に入っていて、手の記号はその時点の持ち方での面の名前です。[x] のように括弧で囲んだ持ち替えは L・R の回転と同時に起きたもので、ワイドムーブ（r など）やスライス（M）の一部かもしれません
+- ジャイロの記録がないソルブでは持ち替えを検出できないため、長い「間」として現れることがあります
 - データにない数値を推測で作らないでください。断定できないことは推測であると書いてください
 
 出力:
@@ -120,29 +121,44 @@ func SolveInput(s solves.Solve, recent []solves.Solve, st settings.Settings) str
 		fmt.Fprintf(&b, "（ペナルティ %s、実測 %s）", s.Penalty, export.FormatTime(s.TotalMS))
 	}
 	fmt.Fprintf(&b, "\n- 手数: %d（TPS %s）\n- クロス色: %s\n- 持ち方（解法の表記）: %s\n- スクランブル（白上・緑前）: %s\n",
-		len(s.Moves), tps(len(s.Moves), float64(s.TotalMS)), crossColor, st.HoldDescription(), s.Scramble)
+		len(s.Moves), tps(len(s.Moves), float64(s.TotalMS)), crossColor, holdsLine(s, st.HoldDescription()), s.Scramble)
 
 	if ph := phases(s); len(ph) > 0 {
-		b.WriteString("\n## 段階ごと\n| 段階 | 所要 | 認識 | 実行 | 手数 | TPS(実行) | 解法 |\n|---|---|---|---|---|---|---|\n")
+		if s.Holds != nil {
+			b.WriteString("\n## 段階ごと\n| 段階 | 所要 | 認識 | うち持ち替え | 実行 | 手数 | TPS(実行) | 持ち替え | 解法 |\n|---|---|---|---|---|---|---|---|---|\n")
+		} else {
+			b.WriteString("\n## 段階ごと\n| 段階 | 所要 | 認識 | 実行 | 手数 | TPS(実行) | 解法 |\n|---|---|---|---|---|---|---|\n")
+		}
 		for i, p := range ph {
 			sp := s.Splits[i]
-			alg := mergeMoves(s.Moves[min(sp.StartIndex, len(s.Moves)):min(sp.EndIndex, len(s.Moves))])
+			alg := algWithRotations(s, sp.StartIndex, sp.EndIndex)
 			if alg == "" {
 				alg = "(スキップ)"
+			}
+			if s.Holds != nil {
+				r := rotationOf(s, sp)
+				fmt.Fprintf(&b, "| %s | %s | %s | %s | %s | %d | %s | %d回（%s秒） | %s |\n", stageNames[p.stage], sec(p.durationMS),
+					sec(p.recognition), sec(r.recogMS), sec(p.execution), p.moves, tps(p.moves, p.execution), r.count, sec(r.ms), alg)
+				continue
 			}
 			fmt.Fprintf(&b, "| %s | %s | %s | %s | %d | %s | %s |\n", stageNames[p.stage], sec(p.durationMS),
 				sec(p.recognition), sec(p.execution), p.moves, tps(p.moves, p.execution), alg)
 		}
 		b.WriteString("\n解法は同じ面の続きをまとめた表記です（R R → R2、R R R → R'、R R' は打ち消して消える）。" +
 			"R2 を2手として数えても手数より少ないときは、その差が打ち消しで消えた手（回して戻した手）です。\n")
+		if s.Holds != nil {
+			b.WriteString("「うち持ち替え」は、認識の時間（段階の最初の手まで）のうち持ち替えていた時間です。" +
+				"「持ち替え」の列は、その段階の中の持ち替えの回数と合計の時間です（手を回している途中の持ち替えも含む）。\n")
+		}
 	} else if len(s.Moves) > 0 {
-		fmt.Fprintf(&b, "\n## 解法\n%s\n", mergeMoves(s.Moves))
+		fmt.Fprintf(&b, "\n## 解法\n%s\n", algWithRotations(s, 0, len(s.Moves)))
 	}
 
 	if pauses := longPauses(s, 5); len(pauses) > 0 {
 		b.WriteString("\n## 長い間（手と手の間隔、上位）\n")
 		for _, p := range pauses {
-			fmt.Fprintf(&b, "- %s秒（%d手目の前、%s中、直前の手 %s → 次の手 %s）\n", sec(p.gap), p.index+1, stageNames[p.stage], p.before, p.after)
+			fmt.Fprintf(&b, "- %s秒（%d手目の前、%s中、直前の手 %s → 次の手 %s%s）\n", sec(p.gap), p.index+1, stageNames[p.stage], p.before, p.after,
+				pauseRotation(s, p.index))
 		}
 	}
 
@@ -362,10 +378,23 @@ func MultiInput(list []solves.Solve, title string, st settings.Settings) string 
 	} else if len(list) > 0 {
 		b.WriteString("\n（段階の記録はありません）\n")
 	}
+	if hasGyro(list) {
+		b.WriteString(multiRotations(list))
+	}
 	if modes[solves.ModeCase] {
 		fmt.Fprintf(&b, "\n## ケース別\n%s", caseTable(list))
 	}
 	return b.String()
+}
+
+// hasGyro はジャイロのデータがあるソルブを含むか（ジャイロを使ったことがなければ、持ち替えの節を出さない）。
+func hasGyro(list []solves.Solve) bool {
+	for _, s := range list {
+		if s.Holds != nil || len(s.Gyro) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func lastN(xs []int64, n int) []int64 {
