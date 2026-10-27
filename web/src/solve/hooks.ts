@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createSolve, listSolves, type NewSolve, type Solve, type SolveFilter } from '../api'
 import { useCubeStore } from '../cube/hooks'
+import { useSettings } from '../settings/hooks'
 import { SolveSession, type ExerciseSource, type SessionState } from './session'
 
 /**
@@ -28,6 +29,11 @@ export function useSolveSession(
   useEffect(() => {
     session?.setInspection(inspection)
   }, [session, inspection])
+  const { settings } = useSettings()
+  const { use_gyro, hold_bottom, hold_front } = settings
+  useEffect(() => {
+    session?.setGyro(use_gyro ? { bottom: hold_bottom, front: hold_front } : null)
+  }, [session, use_gyro, hold_bottom, hold_front])
   return session
 }
 

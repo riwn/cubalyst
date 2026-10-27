@@ -11,8 +11,10 @@
 import type { KPattern } from 'cubing/kpuzzle'
 import type { NewSolve, SolveMode } from '../api'
 import type { Penalty } from './stats'
-import type { LoggedMove, CubeStore } from '../cube/store'
-import { fitTimestamps } from '../cube/timestamps'
+import type { LoggedMove, CubeStore, GyroReading } from '../cube/store'
+import type { GyroSample, Hold } from '../cube/gyro'
+import { detectHolds } from './holds'
+import { fitTimestamps, type FittedMove } from '../cube/timestamps'
 import { scrambleBetween } from '../cases/exercise'
 import { ScrambleTracker, type ScrambleProgress } from './scramble-tracker'
 
@@ -36,6 +38,9 @@ export type SessionPhase = 'generating' | 'scrambling' | 'ready' | 'running'
 /** WCAのインスペクション：15秒を超えたら+2、17秒を超えたらDNF。 */
 export const INSPECTION_MS = 15_000
 export const INSPECTION_DNF_MS = 17_000
+
+/** 着手前に残すジャイロのサンプルの長さ（ms）。 */
+const GYRO_LEAD_MS = 500
 
 /** インスペクション開始から最初の回転までの時間に対するペナルティ。 */
 export function inspectionPenalty(elapsedMs: number): Penalty {
@@ -83,6 +88,9 @@ export class SolveSession {
   private listeners = new Set<() => void>()
   private tracker: ScrambleTracker | null = null
   private solveMoves: LoggedMove[] = []
+  /** ジャイロで持ち替えを記録するときの、着手時の持ち方。null なら記録しない。 */
+  private gyroHold: Hold | null = null
+  private gyroReadings: GyroReading[] = []
   private unsubscribes: (() => void)[] = []
   private generation = 0
   /** 今の状態からの手順の生成を、新しいものだけ有効にするための番号。 */
@@ -102,6 +110,7 @@ export class SolveSession {
       store.view.subscribe((u) => {
         if (u.type === 'replace') this.handleReplace(u.pattern)
       }),
+      store.gyro.subscribe((r) => this.handleGyro(r)),
     )
   }
 
@@ -124,6 +133,12 @@ export class SolveSession {
     if (this.state.inspection !== on) this.set({ inspection: on })
   }
 
+  /** ジャイロで持ち替えを記録するか。hold は着手時の持ち方（設定の持ち方）。 */
+  setGyro(hold: Hold | null) {
+    this.gyroHold = hold
+    if (!hold) this.gyroReadings = []
+  }
+
   dispose() {
     this.disposed = true
     this.unsubscribes.forEach((u) => u())
@@ -136,6 +151,7 @@ export class SolveSession {
     this.scrambleToken++
     this.tracker = null
     this.solveMoves = []
+    this.gyroReadings = []
     this.set({
       phase: 'generating',
       exercise: null,
@@ -230,6 +246,19 @@ export class SolveSession {
     }
   }
 
+  private handleGyro(r: GyroReading) {
+    if (!this.gyroHold) return
+    const { phase } = this.state
+    if (phase === 'running') {
+      this.gyroReadings.push(r)
+    } else if (phase === 'ready') {
+      // 着手前は直近の分だけ残す
+      this.gyroReadings.push(r)
+      const from = this.gyroReadings.findIndex((g) => g.timestamp >= r.timestamp - GYRO_LEAD_MS)
+      if (from > 0) this.gyroReadings = this.gyroReadings.slice(from)
+    }
+  }
+
   private handleReplace(pattern: KPattern) {
     const { phase } = this.state
     if (phase === 'scrambling' && this.tracker) {
@@ -244,6 +273,8 @@ export class SolveSession {
     const exercise = this.state.exercise
     if (!exercise || !exercise.isGoal(pattern)) return
     const fitted = fitTimestamps(this.solveMoves)
+    const gyro = this.gyroHold ? gyroSamples(this.gyroReadings, fitted) : []
+    const timed = fitted.map((m) => ({ move: m.move, t: Math.round(m.fittedTimestamp) }))
     const solve: NewSolve = {
       mode: exercise.mode,
       solved_at: new Date().toISOString(),
@@ -260,8 +291,24 @@ export class SolveSession {
       step: exercise.step ?? null,
       note: '',
     }
+    if (gyro.length) {
+      solve.gyro = gyro
+      solve.holds = detectHolds(gyro, timed, this.gyroHold!)
+    }
     this.set({ last: solve })
     this.onSolved(solve)
     void this.next()
   }
+}
+
+/**
+ * ジャイロのサンプルを、回転ログの t（補正後の、ソルブ開始からの相対ms）と同じ基準にする。
+ * どちらも PC 時刻を持っているので、回転ログの PC 時刻と t の差の平均でずらす。
+ */
+export function gyroSamples(readings: GyroReading[], fitted: FittedMove[]): GyroSample[] {
+  const pairs = fitted.filter((m) => m.localTimestamp != null)
+  if (readings.length === 0 || pairs.length === 0) return []
+  const offset = pairs.reduce((sum, m) => sum + (m.localTimestamp! - m.fittedTimestamp), 0) / pairs.length
+  const r4 = (n: number) => Math.round(n * 10000) / 10000
+  return readings.map((r) => [Math.round(r.timestamp - offset), r4(r.q.w), r4(r.q.x), r4(r.q.y), r4(r.q.z)])
 }

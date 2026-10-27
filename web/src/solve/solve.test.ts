@@ -1,8 +1,10 @@
 import { cube3x3x3 } from 'cubing/puzzles'
 import { describe, expect, it } from 'vitest'
 import type { NewSolve } from '../api'
+import { quatFromHold, slerp, type Hold } from '../cube/gyro'
 import { MockConnection } from '../cube/mock'
 import { CubeStore } from '../cube/store'
+import { applyRotation } from './holds'
 import { invert, simplify } from './notation'
 import { ScrambleTracker } from './scramble-tracker'
 import { SolveSession, inspectionPenalty, isSolved, type Exercise } from './session'
@@ -124,6 +126,58 @@ describe('SolveSession with mock cube', () => {
     )
     return { store, mock, session, saved }
   }
+
+  it('records gyro samples and the holds when enabled', async () => {
+    const { store, mock, session, saved } = setup()
+    const start: Hold = { bottom: 'white', front: 'red' }
+    session.setGyro(start)
+    await session.next()
+    const qa = quatFromHold(start, 0.3)
+    const qb = quatFromHold(applyRotation(start, 'y'), 0.3)
+    // 3050〜3250 で y の持ち替え
+    const q = (t: number) => (t < 3050 ? qa : t < 3250 ? slerp(qa, qb, (t - 3050) / 200) : qb)
+    let g = 0
+    const gyroUntil = (end: number) => {
+      for (; g <= end; g += 90) store.handleEvent({ type: 'gyro', timestamp: g, q: q(g) })
+    }
+    let t = 1000
+    const turn = (m: string) => {
+      gyroUntil(t)
+      mock.turn(m, { localTimestamp: t, cubeTimestamp: t * 2 })
+      t += 200
+    }
+    turn('R')
+    turn('U')
+    turn("R'")
+    // スクランブルが終わってから、しばらく見てから解く
+    t = 3000
+    turn('R')
+    turn("U'")
+    turn("R'")
+    await flush()
+
+    expect(saved).toHaveLength(1)
+    const gyro = saved[0].gyro!
+    // 着手（PC 時刻 3000、t=0）の 0.5 秒前から、t は回転ログと同じ基準
+    expect(gyro[0][0]).toBeGreaterThanOrEqual(-500)
+    expect(gyro[0][0]).toBeLessThan(-400)
+    expect(gyro[gyro.length - 1][0]).toBeLessThanOrEqual(400)
+    expect(saved[0].holds).toMatchObject({ start, changes: [{ rot: 'y', bottom: 'white', front: 'green' }] })
+  })
+
+  it('records no gyro when disabled', async () => {
+    const { store, mock, session, saved } = setup()
+    await session.next()
+    let t = 1000
+    for (const m of ['R', 'U', "R'", 'R', "U'", "R'"]) {
+      store.handleEvent({ type: 'gyro', timestamp: t - 50, q: quatFromHold({ bottom: 'white', front: 'red' }) })
+      mock.turn(m, { localTimestamp: t, cubeTimestamp: t * 2 })
+      t += 200
+    }
+    await flush()
+    expect(saved[0].gyro).toBeUndefined()
+    expect(saved[0].holds).toBeUndefined()
+  })
 
   it('scrambles, times, and saves a solve', async () => {
     const { mock, session, saved } = setup()

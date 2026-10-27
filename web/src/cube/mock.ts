@@ -1,14 +1,22 @@
 // モック接続。実機なしで回転イベントを流すためのもの。
 // - turn(): ボタン／キーボードから1手ずつ回す
 // - replay(): 回転ログ（JSON）を記録時の間隔どおりに再生する
+// - setGyro() / rotateHold(): ジャイロのデータを流す（約 11 回/秒）、持ち替える
 
 import type { KPattern, KPuzzle } from 'cubing/kpuzzle'
 import { Emitter, type CubeConnection, type CubeEvent, type CubeMove } from './connection'
 import { patternToFacelets } from './facelets'
+import { quatFromHold, slerp, type Hold, type Quat } from './gyro'
+import { applyRotation } from '../solve/holds'
 
 /** 実機の時計ズレを模したキューブ時計（PC時計より少し速い）。 */
 const CUBE_CLOCK_SKEW = 1.003
 const CUBE_CLOCK_OFFSET = 123_456
+/** ジャイロのデータを送る間隔（実機の GAN i4 は約 90ms）と、持ち替えにかける時間。 */
+const GYRO_INTERVAL_MS = 90
+const HOLD_ROTATION_MS = 200
+/** 解く人から見た前の方向（基準の座標での水平の向き。実機と同じく決まった値ではない）。 */
+const GYRO_YAW = 0.3
 
 export class MockConnection implements CubeConnection {
   readonly info = { kind: 'mock' as const, deviceName: 'Mock Cube', protocol: 'mock' }
@@ -20,6 +28,9 @@ export class MockConnection implements CubeConnection {
   private replayTimers: ReturnType<typeof setTimeout>[] = []
   private connected = true
   private now: () => number
+  private hold: Hold | null = null
+  private holdAnim: { from: Quat; to: Quat; start: number } | null = null
+  private gyroTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(kpuzzle: KPuzzle, opts: { now?: () => number } = {}) {
     this.kpuzzle = kpuzzle
@@ -59,6 +70,43 @@ export class MockConnection implements CubeConnection {
     return () => this.stopReplay()
   }
 
+  /** ジャイロのデータを流すか（実機で GAN のアプリの省電力をオフにした状態）。hold は今の持ち方。 */
+  setGyro(hold: Hold | null) {
+    if (this.gyroTimer) clearInterval(this.gyroTimer)
+    this.gyroTimer = null
+    this.hold = hold
+    this.holdAnim = null
+    if (hold) this.gyroTimer = setInterval(() => this.emitGyro(), GYRO_INTERVAL_MS)
+  }
+
+  get gyroHold(): Hold | null {
+    return this.hold
+  }
+
+  /** 持ち替える（y、x' など）。200ms かけて向きを変える。 */
+  rotateHold(rot: string) {
+    if (!this.hold) return
+    const from = this.currentQuat()
+    this.hold = applyRotation(this.hold, rot)
+    this.holdAnim = { from, to: quatFromHold(this.hold, GYRO_YAW), start: this.now() }
+  }
+
+  private currentQuat(): Quat {
+    const target = quatFromHold(this.hold!, GYRO_YAW)
+    if (!this.holdAnim) return target
+    const u = (this.now() - this.holdAnim.start) / HOLD_ROTATION_MS
+    if (u >= 1) {
+      this.holdAnim = null
+      return target
+    }
+    return slerp(this.holdAnim.from, this.holdAnim.to, u)
+  }
+
+  private emitGyro() {
+    if (!this.connected || !this.hold) return
+    this.emitter.emit({ type: 'gyro', timestamp: Math.round(this.now()), q: this.currentQuat() })
+  }
+
   stopReplay() {
     this.replayTimers.forEach(clearTimeout)
     this.replayTimers = []
@@ -79,6 +127,7 @@ export class MockConnection implements CubeConnection {
 
   async disconnect() {
     this.stopReplay()
+    this.setGyro(null)
     this.connected = false
     this.emitter.emit({ type: 'disconnect' })
   }

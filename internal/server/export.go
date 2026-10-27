@@ -55,6 +55,29 @@ func (s *Server) handleReplaceSplits(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, solve)
 }
 
+// handleReplaceHolds は PUT /api/solves/{id}/holds（持ち替えの再計算用）。本文が null なら記録なしにする。
+func (s *Server) handleReplaceHolds(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var in *solves.Holds
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := s.solves.ReplaceHolds(r.Context(), id, in); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	solve, err := s.solves.Get(r.Context(), id)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, solve)
+}
+
 // handleExport は GET /api/export?format=json|csv|txt ＋一覧と同じフィルタ（limit は既定で無制限、古い順）。
 func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()

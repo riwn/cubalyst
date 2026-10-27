@@ -1,6 +1,8 @@
 // Goサーバー（/api）へのクライアント。
 
+import type { GyroSample } from './cube/gyro'
 import type { CrossColor, Split } from './solve/cfop'
+import type { Holds } from './solve/holds'
 import type { Penalty } from './solve/stats'
 
 export type Health = {
@@ -42,6 +44,10 @@ export type Solve = {
   step: string | null
   note: string
   splits?: Split[]
+  /** ジャイロの生データ（include=moves のときだけ。ジャイロの無いソルブには無い）。 */
+  gyro?: GyroSample[]
+  /** 持ち替え（ジャイロから計算した派生データ）。記録が無ければ null か無し。 */
+  holds?: Holds | null
   /** このソルブを対象にした解析の数（includeAnalyses のときだけ）。 */
   analyses?: { solve: number; multi: number }
 }
@@ -122,6 +128,10 @@ export function replaceSplits(id: number, splits: Split[]): Promise<Solve> {
   return request(`/api/solves/${id}/splits`, { method: 'PUT', body: JSON.stringify(splits) })
 }
 
+export function replaceHolds(id: number, holds: Holds | null): Promise<Solve> {
+  return request(`/api/solves/${id}/holds`, { method: 'PUT', body: JSON.stringify(holds) })
+}
+
 export type Settings = {
   cross_color: CrossColor
   /** 解くときの持ち方（下の色・前の色）。解法の表記をこの向きに合わせる。 */
@@ -129,6 +139,8 @@ export type Settings = {
   hold_front: CrossColor
   /** フルソルブでWCA方式の15秒インスペクションを使うか。 */
   inspection: boolean
+  /** ジャイロで持ち替えを記録するか（ジャイロのデータはキューブ側で切る）。 */
+  use_gyro: boolean
 }
 
 export function getSettings(): Promise<Settings> {

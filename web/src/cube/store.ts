@@ -3,12 +3,19 @@
 
 import type { KPattern, KPuzzle } from 'cubing/kpuzzle'
 import { Emitter, type CubeConnection, type CubeEvent, type CubeMove } from './connection'
+import type { Quat } from './gyro'
 import { SOLVED_FACELETS, faceletsToPattern, patternToFacelets } from './facelets'
 
 /** ログに残す1手。receivedAt はストアが受け取ったPC時刻。 */
 export type LoggedMove = CubeMove & { receivedAt: number }
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected'
+
+/** ジャイロ：active＝届いている、none＝届いていない、unsupported＝届いたが使えないキューブ。 */
+export type GyroStatus = 'none' | 'active' | 'unsupported'
+
+/** ジャイロの1サンプル。timestamp は PC 側の時刻（performance.now() 基準）。 */
+export type GyroReading = { timestamp: number; q: Quat }
 
 export type CubeState = {
   status: ConnectionStatus
@@ -26,6 +33,7 @@ export type CubeState = {
   resyncCount: number
   /** 接続（またはリセット）以降の回転ログ。 */
   moves: LoggedMove[]
+  gyro: GyroStatus
   /** MACアドレスの入力待ち。 */
   macRequest: { deviceName: string } | null
 }
@@ -35,17 +43,23 @@ export type ViewUpdate = { type: 'move'; move: string } | { type: 'replace'; pat
 
 const MAX_LOGGED_MOVES = 2000
 const BATTERY_POLL_MS = 60_000
+/** ジャイロのデータがこれだけ届かなければ「届いていない」にする。 */
+const GYRO_STALE_MS = 2_000
 
 export class CubeStore {
   readonly kpuzzle: KPuzzle
   readonly view = new Emitter<ViewUpdate>()
   /** 回転ごとに通知する（Phase 2以降のタイマー等が購読する）。 */
   readonly moves = new Emitter<{ move: LoggedMove; pattern: KPattern }>()
+  /** ジャイロのサンプルごとに通知する（約 11 回/秒。state には入れず、再描画させない）。 */
+  readonly gyro = new Emitter<GyroReading>()
 
   private state: CubeState
   private listeners = new Set<() => void>()
   private unsubscribe: (() => void) | null = null
   private batteryTimer: ReturnType<typeof setInterval> | null = null
+  private gyroTimer: ReturnType<typeof setInterval> | null = null
+  private lastGyroAt = 0
   private macResolver: ((mac: string | null) => void) | null = null
 
   constructor(kpuzzle: KPuzzle) {
@@ -62,6 +76,7 @@ export class CubeStore {
       deviceFacelets: null,
       resyncCount: 0,
       moves: [],
+      gyro: 'none',
       macRequest: null,
     }
   }
@@ -114,8 +129,12 @@ export class CubeStore {
       deviceFacelets: null,
       resyncCount: 0,
       moves: [],
+      gyro: 'none',
       macRequest: null,
     })
+    this.gyroTimer = setInterval(() => {
+      if (this.state.gyro === 'active' && performance.now() - this.lastGyroAt > GYRO_STALE_MS) this.set({ gyro: 'none' })
+    }, 1000)
     const report = (err: unknown) => this.set({ error: err instanceof Error ? err.message : String(err) })
     if (conn.capabilities.facelets) conn.requestFacelets().catch(report)
     if (conn.capabilities.battery) {
@@ -127,7 +146,7 @@ export class CubeStore {
   async disconnect() {
     const conn = this.state.connection
     this.detach()
-    this.set({ status: 'disconnected', connection: null, battery: null })
+    this.set({ status: 'disconnected', connection: null, battery: null, gyro: 'none' })
     await conn?.disconnect().catch(() => {})
   }
 
@@ -136,6 +155,8 @@ export class CubeStore {
     this.unsubscribe = null
     if (this.batteryTimer) clearInterval(this.batteryTimer)
     this.batteryTimer = null
+    if (this.gyroTimer) clearInterval(this.gyroTimer)
+    this.gyroTimer = null
   }
 
   /** 実機の状態を取り直す。 */
@@ -193,9 +214,17 @@ export class CubeStore {
       case 'battery':
         this.set({ battery: e.level })
         break
+      case 'gyro':
+        this.lastGyroAt = performance.now()
+        if (this.state.gyro !== 'active') this.set({ gyro: 'active' })
+        this.gyro.emit({ timestamp: e.timestamp, q: e.q })
+        break
+      case 'gyro-unsupported':
+        this.set({ gyro: 'unsupported' })
+        break
       case 'disconnect':
         this.detach()
-        this.set({ status: 'disconnected', connection: null, battery: null, error: '接続が切れました' })
+        this.set({ status: 'disconnected', connection: null, battery: null, gyro: 'none', error: '接続が切れました' })
         break
     }
   }

@@ -65,6 +65,10 @@ type Solve struct {
 	Step     *string   `json:"step"`
 	Note     string    `json:"note"`
 	Splits   []Split   `json:"splits,omitempty"`
+	// Gyro はジャイロの生データ（一覧では include=moves のときだけ）。ジャイロの無いソルブでは空。
+	Gyro []GyroSample `json:"gyro,omitempty"`
+	// Holds は Gyro から計算した持ち替え。記録が無ければ nil。
+	Holds *Holds `json:"holds,omitempty"`
 	// Analyses はこのソルブを対象にした解析の数（一覧で include=analyses のときだけ）。
 	Analyses *AnalysisCounts `json:"analyses,omitempty"`
 }
@@ -101,6 +105,12 @@ func (s *Solve) Validate() error {
 		if m.Move == "" {
 			return fmt.Errorf("moves[%d]: move is empty", i)
 		}
+	}
+	if s.Holds != nil && len(s.Gyro) == 0 {
+		return ErrNoGyro
+	}
+	if err := s.Holds.Validate(len(s.Moves)); err != nil {
+		return err
 	}
 	return ValidateSplits(s.Splits, len(s.Moves))
 }
@@ -160,16 +170,24 @@ func (st *Store) Create(ctx context.Context, s *Solve) error {
 	if err != nil {
 		return err
 	}
+	gyro, err := jsonOrEmpty(s.Gyro, len(s.Gyro) > 0)
+	if err != nil {
+		return err
+	}
+	holds, err := jsonOrEmpty(s.Holds, s.Holds != nil)
+	if err != nil {
+		return err
+	}
 	tx, err := st.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	res, err := tx.ExecContext(ctx, `INSERT INTO solves
-		(mode, solved_at, total_ms, penalty, scramble, moves, case_id, step, note)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		(mode, solved_at, total_ms, penalty, scramble, moves, case_id, step, note, gyro, holds)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		s.Mode, s.SolvedAt.UTC().Format(timeLayout), s.TotalMS, s.Penalty, s.Scramble,
-		string(moves), s.CaseID, s.Step, s.Note)
+		string(moves), s.CaseID, s.Step, s.Note, gyro, holds)
 	if err != nil {
 		return err
 	}
@@ -215,6 +233,35 @@ func (st *Store) ReplaceSplits(ctx context.Context, id int64, splits []Split) er
 		return err
 	}
 	return tx.Commit()
+}
+
+// ReplaceHolds はソルブの持ち替えを置き換える（持ち替えの再計算用）。nil なら記録なしにする。
+func (st *Store) ReplaceHolds(ctx context.Context, id int64, holds *Holds) error {
+	s, err := st.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if holds != nil && len(s.Gyro) == 0 {
+		return ErrNoGyro
+	}
+	if err := holds.Validate(len(s.Moves)); err != nil {
+		return err
+	}
+	v, err := jsonOrEmpty(holds, holds != nil)
+	if err != nil {
+		return err
+	}
+	_, err = st.db.ExecContext(ctx, `UPDATE solves SET holds = ? WHERE id = ?`, v, id)
+	return err
+}
+
+// jsonOrEmpty は ok なら v の JSON、そうでなければ空文字列（ジャイロの列で「無し」を表す）。
+func jsonOrEmpty(v any, ok bool) (string, error) {
+	if !ok {
+		return "", nil
+	}
+	b, err := json.Marshal(v)
+	return string(b), err
 }
 
 // loadSplits は複数ソルブの段階をまとめて読み込む。
@@ -368,11 +415,11 @@ func (st *Store) List(ctx context.Context, f Filter) ([]Solve, int, error) {
 	if err := st.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM solves"+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-	movesCol := "'[]'"
+	movesCol, gyroCol := "'[]'", "''"
 	if f.IncludeMoves {
-		movesCol = "moves"
+		movesCol, gyroCol = "moves", "gyro"
 	}
-	q := `SELECT id, mode, solved_at, total_ms, penalty, scramble, ` + movesCol + `, case_id, step, note
+	q := `SELECT id, mode, solved_at, total_ms, penalty, scramble, ` + movesCol + `, case_id, step, note, ` + gyroCol + `, holds
 		FROM solves` + where + f.orderBy()
 	if f.Limit > 0 {
 		q += fmt.Sprintf(" LIMIT %d OFFSET %d", f.Limit, f.Offset)
@@ -443,7 +490,7 @@ func (st *Store) loadAnalysisCounts(ctx context.Context, list []Solve) error {
 
 // Get は1件取得する。
 func (st *Store) Get(ctx context.Context, id int64) (Solve, error) {
-	row := st.db.QueryRowContext(ctx, `SELECT id, mode, solved_at, total_ms, penalty, scramble, moves, case_id, step, note
+	row := st.db.QueryRowContext(ctx, `SELECT id, mode, solved_at, total_ms, penalty, scramble, moves, case_id, step, note, gyro, holds
 		FROM solves WHERE id = ?`, id)
 	s, err := scanSolve(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -497,10 +544,21 @@ type scanner interface {
 
 func scanSolve(r scanner) (Solve, error) {
 	var s Solve
-	var solvedAt, moves string
+	var solvedAt, moves, gyro, holds string
 	var caseID, step sql.NullString
-	if err := r.Scan(&s.ID, &s.Mode, &solvedAt, &s.TotalMS, &s.Penalty, &s.Scramble, &moves, &caseID, &step, &s.Note); err != nil {
+	if err := r.Scan(&s.ID, &s.Mode, &solvedAt, &s.TotalMS, &s.Penalty, &s.Scramble, &moves, &caseID, &step, &s.Note, &gyro, &holds); err != nil {
 		return Solve{}, err
+	}
+	if gyro != "" {
+		if err := json.Unmarshal([]byte(gyro), &s.Gyro); err != nil {
+			return Solve{}, fmt.Errorf("solve %d: parse gyro: %w", s.ID, err)
+		}
+	}
+	if holds != "" {
+		s.Holds = &Holds{}
+		if err := json.Unmarshal([]byte(holds), s.Holds); err != nil {
+			return Solve{}, fmt.Errorf("solve %d: parse holds: %w", s.ID, err)
+		}
 	}
 	t, err := time.Parse(time.RFC3339Nano, solvedAt)
 	if err != nil {
