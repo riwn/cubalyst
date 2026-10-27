@@ -15,7 +15,7 @@ import {
   type GyroSample,
   type Hold,
 } from '../cube/gyro'
-import { convertMove, holdFrame, rightColor, type Frame } from '../cube/orientation'
+import { convertMove, holdFrame, isValidHold, rightColor, type Color, type Frame } from '../cube/orientation'
 import type { TimedMove } from './cfop'
 
 export type HoldChange = {
@@ -33,7 +33,12 @@ export type HoldChange = {
   with_move: boolean
 }
 
-export type Holds = { start: Hold; changes: HoldChange[] }
+export type Holds = {
+  start: Hold
+  changes: HoldChange[]
+  /** 着手時の前の色を、回した手の偏りから決めた（無ければ設定の前の色を仮定した）。 */
+  estimated?: boolean
+}
 
 export const HOLD_OPTIONS = {
   /** これより軸からずれているサンプルは「回している途中」とみなす（度）。 */
@@ -47,6 +52,8 @@ export const HOLD_OPTIONS = {
   maxGapMs: 3000,
   /** x 系の持ち替えと L・R の回転がこれ以内なら with_move とする（ms）。 */
   withMoveMs: 150,
+  /** 着手時の前の色を推定するとき、点数（R の数 − B の数）が2番目の候補よりこれだけ多ければ採る。 */
+  estimateMargin: 3,
 }
 
 // --- 持ち替えの記号 ---
@@ -162,6 +169,39 @@ export function detectHolds(samples: GyroSample[], moves: TimedMove[], start: Ho
     prev = c
   }
   return { start, changes }
+}
+
+/**
+ * detectHolds の、着手時の前の色を推定する版。ジャイロでは水平の向きが分からないので、下の色が setting と同じ
+ * 4通りの前の色で持ち替えを計算し、持ち方の記号で「R の数 − B の数」が一番多いものを採る（CFOP では R をよく回し、
+ * B はほとんど回さない。B だけだと、R・U だけの手順で前と横の区別が付かない）。
+ * 差が estimateMargin に届かなければ（手が少ないなど）、setting の前の色のまま。
+ */
+export function estimateHolds(samples: GyroSample[], moves: TimedMove[], setting: Hold, opts = HOLD_OPTIONS): Holds | null {
+  const base = detectHolds(samples, moves, setting, opts)
+  if (!base) return null
+  const scored = (Object.keys(COLOR_AXIS) as Color[])
+    .filter((front) => isValidHold(setting.bottom, front))
+    .map((front) => {
+      const holds = front === setting.front ? base : detectHolds(samples, moves, { bottom: setting.bottom, front }, opts)
+      return { holds, score: holds ? frontScore(moves, holds) : -Infinity }
+    })
+    .sort((a, b) => b.score - a.score || (a.holds === base ? -1 : b.holds === base ? 1 : 0))
+  const [best, second] = scored
+  if (!best.holds || best.score - second.score < opts.estimateMargin) return base
+  return { ...best.holds, estimated: true }
+}
+
+/** 持ち方 holds での記号の「R の数 − B の数」。 */
+function frontScore(moves: TimedMove[], holds: Holds): number {
+  const byMove = holdsByMove(holds, moves.length)
+  let score = 0
+  moves.forEach((m, i) => {
+    const face = convertMove(holdFrame(byMove[i].bottom, byMove[i].front)!, m.move)[0]
+    if (face === 'R') score++
+    if (face === 'B') score--
+  })
+  return score
 }
 
 // --- 表記 ---

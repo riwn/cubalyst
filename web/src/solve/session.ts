@@ -13,7 +13,7 @@ import type { NewSolve, SolveMode } from '../api'
 import type { Penalty } from './stats'
 import type { LoggedMove, CubeStore, GyroReading } from '../cube/store'
 import type { GyroSample, Hold } from '../cube/gyro'
-import { detectHolds } from './holds'
+import { estimateHolds } from './holds'
 import { fitTimestamps, type FittedMove } from '../cube/timestamps'
 import { scrambleBetween } from '../cases/exercise'
 import { ScrambleTracker, type ScrambleProgress } from './scramble-tracker'
@@ -293,7 +293,7 @@ export class SolveSession {
     }
     if (gyro.length) {
       solve.gyro = gyro
-      solve.holds = detectHolds(gyro, timed, this.gyroHold!)
+      solve.holds = estimateHolds(gyro, timed, this.gyroHold!)
     }
     this.set({ last: solve })
     this.onSolved(solve)

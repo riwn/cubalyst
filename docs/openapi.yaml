@@ -650,6 +650,7 @@ components:
       description: ジャイロから計算した持ち替え（持ち方の移り変わり）。記録が無いソルブには無い
       properties:
         start: { $ref: "#/components/schemas/Hold" }
+        estimated: { type: boolean, description: 着手時の前の色を、回した手の偏り（R が多く B が少ない向き）から推定したか。false なら設定の前の色を仮定した }
         changes:
           type: array
           items:

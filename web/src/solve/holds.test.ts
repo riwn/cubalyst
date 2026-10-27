@@ -2,7 +2,7 @@ import { cube3x3x3 } from 'cubing/puzzles'
 import { describe, expect, it } from 'vitest'
 import { holdAt, quatFromHold, rotate, slerp, type GyroSample, type Hold, type Quat } from '../cube/gyro'
 import { holdFrame, holdRotation, isValidHold, type Color } from '../cube/orientation'
-import { applyRotation, detectHolds, notationTokens, rotationName } from './holds'
+import { applyRotation, detectHolds, estimateHolds, notationTokens, rotationName } from './holds'
 
 const kpuzzle = await cube3x3x3.kpuzzle()
 const solved = kpuzzle.defaultPattern()
@@ -150,6 +150,42 @@ describe('detectHolds', () => {
     const res = detectHolds(samples, ms, START)!
     expect(res.changes).toMatchObject([{ rot: 'x', with_move: true }])
     expect(detectHolds(samples, moves(30), START)!.changes).toMatchObject([{ rot: 'x', with_move: false }])
+  })
+})
+
+describe('estimateHolds', () => {
+  // 解く人の持ち方 hold での記号の列を、キューブ自身の向きの回転ログにする
+  const cubeMoves = (hold: Hold, alg: string) => {
+    const frame = holdFrame(hold.bottom, hold.front)!
+    const cube = (m: string) => Object.keys(frame).find((f) => frame[f] === m[0])! + m.slice(1)
+    return alg.split(' ').map((m, i) => ({ move: cube(m), t: i * 100 }))
+  }
+  const sexy = Array(8).fill("R U R' U'").join(' ')
+
+  it('finds the front from the moves', () => {
+    // 設定は下白・前赤だが、実際は前緑で持って解いた
+    const actual: Hold = { bottom: 'white', front: 'green' }
+    const ms = cubeMoves(actual, `${sexy} F R U R' U' F'`)
+    const samples = rotateBetween(actual, actual, 0, 4000)
+    const res = estimateHolds(samples, ms, START)!
+    expect(res).toMatchObject({ start: actual, estimated: true })
+    expect(notationTokens(ms, res, holdFrame('white', 'red')!).map((t) => t.text).slice(0, 4)).toEqual(['R', 'U', "R'", "U'"])
+  })
+
+  it('keeps the setting when the moves do not tell', () => {
+    const ms = cubeMoves(START, 'U U U')
+    const samples = rotateBetween(START, START, 0, 1000)
+    expect(estimateHolds(samples, ms, START)).toEqual({ start: START, changes: [] })
+  })
+
+  it('follows y rotations while estimating', () => {
+    const actual: Hold = { bottom: 'white', front: 'orange' }
+    const after = applyRotation(actual, 'y')
+    const ms = [...cubeMoves(actual, sexy).slice(0, 16), ...cubeMoves(after, sexy).slice(0, 16).map((m) => ({ ...m, t: m.t + 2000 }))]
+    const samples = rotateBetween(actual, after, 1650, 4000)
+    const res = estimateHolds(samples, ms, START)!
+    expect(res.start).toEqual(actual)
+    expect(res.changes).toMatchObject([{ rot: 'y', front: after.front }])
   })
 })
 

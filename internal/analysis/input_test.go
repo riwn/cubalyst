@@ -128,7 +128,7 @@ func TestSolveInputWithHolds(t *testing.T) {
 	st := settings.Settings{CrossColor: "white", HoldBottom: "white", HoldFront: "red"}
 	in := SolveInput(withHolds(fullSolve(7, 1)), nil, st)
 	for _, want := range []string{
-		"ジャイロで記録（着手時：下が黄・前が緑）", "持ち替えは 1 回",
+		"ジャイロで記録（着手時：下が黄・前が緑。", "持ち替えは 1 回",
 		"| 段階 | 所要 | 認識 | うち持ち替え |",
 		// F2L 2：認識 0.50 のうち持ち替え 0.25。y のあとは赤が前なので、キューブの R は F
 		"| F2L 2 | 0.80 | 0.50 | 0.25 | 0.30 | 4 | 13.33 | 1回（0.25秒） | y F U F' U' |",

@@ -82,8 +82,12 @@ func rotationOf(s solves.Solve, sp solves.Split) stageRotation {
 func holdsLine(s solves.Solve, holdDescription string) string {
 	switch {
 	case s.Holds != nil:
-		return fmt.Sprintf("ジャイロで記録（着手時：%s）。手の記号は、その時点の持ち方での面の名前です。持ち替えは %d 回",
-			holdDescriptionOf(s.Holds.Start), len(s.Holds.Changes))
+		front := "前の色は設定の持ち方を仮定"
+		if s.Holds.Estimated {
+			front = "前の色は回した手の偏りから推定"
+		}
+		return fmt.Sprintf("ジャイロで記録（着手時：%s。%s）。手の記号は、その時点の持ち方での面の名前です。持ち替えは %d 回",
+			holdDescriptionOf(s.Holds.Start), front, len(s.Holds.Changes))
 	case len(s.Gyro) > 0:
 		return holdDescription + "（固定）。ジャイロのデータはあるが、着手時の下の色が設定と違うか途中で途切れたため、持ち替えは記録なし"
 	default:

@@ -34,6 +34,8 @@ type HoldChange struct {
 type Holds struct {
 	Start   Hold         `json:"start"`
 	Changes []HoldChange `json:"changes"`
+	// Estimated は、着手時の前の色を回した手の偏りから決めたか（false なら設定の前の色を仮定した）。
+	Estimated bool `json:"estimated,omitempty"`
 }
 
 // Validate は持ち替えの値を検証する。moveCount は回転ログの手数。

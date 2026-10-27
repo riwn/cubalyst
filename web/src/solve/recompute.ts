@@ -4,7 +4,7 @@ import type { KPuzzle } from 'cubing/kpuzzle'
 import { listSolves, replaceHolds, replaceSplits } from '../api'
 import type { Hold } from '../cube/gyro'
 import { computeSplits, type CrossColor } from './cfop'
-import { detectHolds } from './holds'
+import { estimateHolds } from './holds'
 
 export async function recomputeAllSplits(
   kpuzzle: KPuzzle,
@@ -26,15 +26,15 @@ export async function recomputeAllSplits(
 }
 
 /**
- * ジャイロの生データがあるソルブの持ち替えを計算し直す。着手時の持ち方は、記録済みならそれ、
- * 無ければ（下の色が違って記録しなかったものなど）hold（設定の持ち方）を使う。
+ * ジャイロの生データがあるソルブの持ち替えを計算し直す。着手時の下の色は、記録済みならそれ、
+ * 無ければ（下の色が違って記録しなかったものなど）hold（設定の持ち方）を使い、前の色は回した手から推定し直す。
  */
 export async function recomputeAllHolds(hold: Hold, onProgress?: (done: number, total: number) => void): Promise<number> {
   const { solves } = await listSolves({ limit: 0, includeMoves: true })
   const targets = solves.filter((s) => s.gyro?.length && s.moves?.length)
   let done = 0
   for (const s of targets) {
-    await replaceHolds(s.id, detectHolds(s.gyro!, s.moves!, s.holds?.start ?? hold))
+    await replaceHolds(s.id, estimateHolds(s.gyro!, s.moves!, s.holds?.start ?? hold))
     done++
     onProgress?.(done, targets.length)
   }
