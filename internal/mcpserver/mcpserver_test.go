@@ -143,6 +143,28 @@ func TestTools(t *testing.T) {
 	}
 }
 
+// pairSolve は、クロスが白（設定の既定）で、最後のペアを F2L 2（R U R'）で入れるソルブ。
+// キューブ自身の向き（白が U）では R D R' になる。
+const pairSolve = `{"mode":"full","solved_at":"2026-10-22T01:02:03.456Z","total_ms":2000,"penalty":"","scramble":"R D' R'",
+	"moves":[{"move":"R","t":500},{"move":"D","t":1000},{"move":"R'","t":2000}],"case_id":null,"step":null,"note":"",
+	"splits":[{"stage":"f2l4","start_ms":0,"end_ms":2000,"move_count":3,"start_index":0,"end_index":3}]}`
+
+func TestGetStageCases(t *testing.T) {
+	cs, _ := connect(t, pairSolve, pairSolve)
+	out, isErr := call(t, cs, "get_stage_cases", map[string]any{"solve_ids": []int{1}})
+	if isErr || !strings.Contains(out, "段階ごとのケース（1件、クロス：白）") || !strings.Contains(out, "ソルブ #1") ||
+		!strings.Contains(out, "F2L 2（3手）") || !strings.Contains(out, "離れている → ペア → 入る") {
+		t.Fatalf("get_stage_cases one: %s", out)
+	}
+	out, isErr = call(t, cs, "get_stage_cases", map[string]any{"limit": 2})
+	if isErr || !strings.Contains(out, "F2L：始めたときの形ごと") || !strings.Contains(out, "| 上段で離れている（クロスの色が横） | 2 | 100% |") {
+		t.Fatalf("get_stage_cases summary: %s", out)
+	}
+	if out, isErr = call(t, cs, "get_stage_cases", map[string]any{"solve_ids": []int{9}}); !isErr || !strings.Contains(out, "not found") {
+		t.Fatalf("get_stage_cases missing: %s", out)
+	}
+}
+
 func TestEmptyAndUnreachable(t *testing.T) {
 	cs, _ := connect(t)
 	if out, isErr := call(t, cs, "get_solve", nil); !isErr || !strings.Contains(out, "まだありません") {

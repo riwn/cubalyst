@@ -64,6 +64,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/analyses/{id}", s.handleDeleteAnalysis)
 	mux.HandleFunc("GET /api/solves/{id}/analysis-input", s.handleSolveAnalysisInput)
 	mux.HandleFunc("GET /api/analysis-input", s.handleMultiAnalysisInput)
+	mux.HandleFunc("GET /api/stage-cases", s.handleStageCases)
 	mux.HandleFunc("GET /api/stats/practice", s.handlePracticeStats)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})

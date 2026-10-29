@@ -26,6 +26,7 @@ AI ツール（Claude Code / Claude Desktop / Codex CLI など）
 | `list_solves` | ソルブの一覧（ID、日時、タイム、手数、Cross / F2L / OLL / PLL ごとの時間、単体の解析済みか、まとめ解析に含まれるか）と、最後のまとめ解析 |
 | `get_solve` | 1回のソルブを単体で解析するためのデータ。ID を省くと直近のフルソルブ |
 | `get_solves` | 複数のソルブをまとめて解析するためのデータと、対象にしたソルブの ID（`solve_ids`、または `mode`・`from`/`to`・`limit` で選ぶ） |
+| `get_stage_cases` | 回転ログを再生して求めた、各段階を始めたときの形。F2L は各ペアの形・ケース（41ケース）と、離す・ペアにする・入れるまでの移り変わり。OLL・PLL は手順の切れ目ごとのケース（1-look か 2-look か、やり直したか）。複数件なら形・ケースごとの集計。対象の選び方は `get_solves` と同じ |
 | `list_analyses` | 保存済みの解析結果 |
 | `save_analysis` | 解析結果（Markdown）を保存する。単体は `kind=solve`・`solve_id`、まとめは `kind=multi`・`solve_ids`・`title`。アプリの「解析」画面に表示される |
 
