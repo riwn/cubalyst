@@ -21,6 +21,7 @@ import (
 
 	"github.com/riwn/cubalyst/internal/analysis"
 	"github.com/riwn/cubalyst/internal/solves"
+	"github.com/riwn/cubalyst/internal/stagecases"
 )
 
 // Instructions は接続した AI に渡す前提。
@@ -36,7 +37,8 @@ const Instructions = `Cubalyst は、スマートキューブで記録したル�
 1. 対象を決める。ソルブの ID や「直近のソルブ」「直近10件」のように決まるなら、そのまま進む。
    決まらないときは、解析を始める前に list_solves の一覧（単体の解析済みか、まとめに含まれているかも出る）を見せて、
    どのソルブを単体で解析するか、どの範囲をまとめて解析するかを選んでもらう
-2. 入力データを取る（必要なら list_analyses で過去の解析も見る）
+2. 入力データを取る（必要なら list_analyses で過去の解析も見る）。フルソルブなら、同じ対象で get_stage_cases も呼び、
+   各段階を始めたときの形（F2L のペアの形とケース、OLL・PLL の手順の切れ目）を見る。形やケースを解法の記号から推測しない
 3. 下の「解析の前提と出力」に沿って解析する
 4. 解析を頼まれたときは save_analysis で保存する。保存した結果はアプリの「解析」画面に出る
 
@@ -100,7 +102,7 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 
 // New は MCP サーバーを作る。
 func New(c *Client) *mcp.Server {
-	s := mcp.NewServer(&mcp.Implementation{Name: "cubalyst", Version: "1.1.0"}, &mcp.ServerOptions{Instructions: Instructions})
+	s := mcp.NewServer(&mcp.Implementation{Name: "cubalyst", Version: "1.2.0"}, &mcp.ServerOptions{Instructions: Instructions})
 	t := tools{c}
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -121,6 +123,15 @@ func New(c *Client) *mcp.Server {
 			"対象にしたソルブの ID を返す。対象は solve_ids、または mode と期間（from・to）と件数（limit）で選ぶ（既定は直近50件のフルソルブ）。",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
 	}, t.getSolves)
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "get_stage_cases",
+		Description: "回転ログを再生して、各段階を始めたときのキューブの形を返す。F2L は各ペアの始めたときの形（41ケースのどれか、" +
+			"くっついているが色が合っていない、片方が別のスロットにある など）と、離す・ペアにする・入れるまでの形の移り変わり。" +
+			"OLL・PLL は手順の切れ目ごとのケース（1-look か 2-look か、やり直したか）。複数件なら形・ケースごとの集計も返す。" +
+			"F2L や最後の段の中身（どの形で手数が増えるか、どう崩しているか、手順を間違えたか）を見たいときに、get_solve・get_solves と一緒に使う。" +
+			"対象の選び方は get_solves と同じ（solve_ids、または mode・期間・件数）。同じソルブからはいつも同じ結果になる。",
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, t.getStageCases)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_analyses",
 		Description: "保存済みの解析結果を新しい順に返す。kind（solve / multi）や solve_id（そのソルブを対象にした単体・まとめの解析）で絞り込める。",
@@ -324,23 +335,7 @@ type getSolvesArgs struct {
 }
 
 func (t tools) getSolves(ctx context.Context, _ *mcp.CallToolRequest, a getSolvesArgs) (*mcp.CallToolResult, any, error) {
-	q := url.Values{}
-	if len(a.SolveIDs) > 0 {
-		ids := make([]string, len(a.SolveIDs))
-		for i, id := range a.SolveIDs {
-			ids[i] = strconv.FormatInt(id, 10)
-		}
-		q.Set("ids", strings.Join(ids, ","))
-	} else {
-		for k, v := range map[string]string{"mode": a.Mode, "from": a.From, "to": a.To} {
-			if v != "" {
-				q.Set(k, v)
-			}
-		}
-		if a.Limit > 0 {
-			q.Set("limit", strconv.Itoa(a.Limit))
-		}
-	}
+	q := selectionQuery(a.SolveIDs, a.Mode, a.From, a.To, a.Limit)
 	if a.Title != "" {
 		q.Set("title", a.Title)
 	}
@@ -355,6 +350,45 @@ func (t tools) getSolves(ctx context.Context, _ *mcp.CallToolRequest, a getSolve
 	return text(fmt.Sprintf("まとめ解析用データ「%s」（%d件）\n\n%s\n\n---\n依頼の例: %s\n"+
 		"保存するときは save_analysis に kind=multi, solve_ids=[%s], title=%q を渡す（見出しは内容に合わせて変えてよい）。",
 		in.Title, len(in.SolveIDs), in.Input, in.Request, strings.Join(ids, ","), in.Title)), nil, nil
+}
+
+type getStageCasesArgs struct {
+	SolveIDs []int64 `json:"solve_ids,omitempty" jsonschema:"対象のソルブの ID。指定したらこれだけを対象にする（1件でもよい）"`
+	Mode     string  `json:"mode,omitempty" jsonschema:"full（既定）/ assist。solve_ids がないとき"`
+	From     string  `json:"from,omitempty" jsonschema:"期間の始まり（YYYY-MM-DD、その日を含む）。solve_ids がないとき"`
+	To       string  `json:"to,omitempty" jsonschema:"期間の終わり（YYYY-MM-DD、その日を含まない）。solve_ids がないとき"`
+	Limit    int     `json:"limit,omitempty" jsonschema:"直近何件を対象にするか（既定 50。期間を指定したときは期間内すべて、最大 1000）"`
+}
+
+func (t tools) getStageCases(ctx context.Context, _ *mcp.CallToolRequest, a getStageCasesArgs) (*mcp.CallToolResult, any, error) {
+	q := selectionQuery(a.SolveIDs, a.Mode, a.From, a.To, a.Limit)
+	var res stagecases.Result
+	if err := t.c.do(ctx, http.MethodGet, "/api/stage-cases", q, nil, &res); err != nil {
+		return nil, nil, err
+	}
+	return text(stagecases.Text(res)), nil, nil
+}
+
+// selectionQuery は対象の選び方（get_solves と同じ）を API のクエリにする。
+func selectionQuery(solveIDs []int64, mode, from, to string, limit int) url.Values {
+	q := url.Values{}
+	if len(solveIDs) > 0 {
+		ids := make([]string, len(solveIDs))
+		for i, id := range solveIDs {
+			ids[i] = strconv.FormatInt(id, 10)
+		}
+		q.Set("ids", strings.Join(ids, ","))
+		return q
+	}
+	for k, v := range map[string]string{"mode": mode, "from": from, "to": to} {
+		if v != "" {
+			q.Set(k, v)
+		}
+	}
+	if limit > 0 {
+		q.Set("limit", strconv.Itoa(limit))
+	}
+	return q
 }
 
 type listAnalysesArgs struct {

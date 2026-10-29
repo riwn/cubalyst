@@ -238,6 +238,30 @@ paths:
               schema: { $ref: "#/components/schemas/AnalysisInput" }
         "400": { $ref: "#/components/responses/BadRequest" }
 
+  /api/stage-cases:
+    get:
+      tags: [解析]
+      summary: 各段階を始めたときのケース（F2L のペアの形、OLL・PLL）と、形・ケースごとの集計
+      description: |
+        回転ログを再生して、F2L の各ペアを始めたときの形（41ケースのどれか、くっついているが色が合っていない、片方が別のスロットにある など）と
+        1手ごとの形の移り変わり、OLL・PLL の手順の切れ目ごとのケースを求める。
+        ids を指定したらそれだけ、無ければ mode・期間・件数で選ぶ（/api/analysis-input と同じ）
+      operationId: stageCases
+      parameters:
+        - $ref: "#/components/parameters/ids"
+        - $ref: "#/components/parameters/mode"
+        - $ref: "#/components/parameters/from"
+        - $ref: "#/components/parameters/to"
+        - { name: limit, in: query, description: 新しい方から何件, schema: { type: integer, minimum: 0 } }
+      responses:
+        "200":
+          description: ソルブごとの判定と集計
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StageCases" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/analyses:
     get:
       tags: [解析]
@@ -704,6 +728,116 @@ components:
         request: { type: string }
         solve_ids: { type: array, items: { type: integer, format: int64 } }
         title: { type: string }
+
+    StageCases:
+      type: object
+      description: 各段階を始めたときのケースと、形・ケースごとの集計
+      properties:
+        cross_color: { type: string }
+        solve_ids: { type: array, items: { type: integer, format: int64 } }
+        solves:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer, format: int64 }
+              solved_at: { type: string, format: date-time }
+              total_ms: { type: integer }
+              penalty: { $ref: "#/components/schemas/Penalty" }
+              pairs: { type: array, items: { $ref: "#/components/schemas/StagePair" } }
+              oll: { $ref: "#/components/schemas/StageLastLayer" }
+              pll: { $ref: "#/components/schemas/StageLastLayer" }
+        summary:
+          type: object
+          properties:
+            pairs: { type: integer, description: ペアの数 }
+            f2l_shapes:
+              type: array
+              description: 始めたときの形ごと（多い順）
+              items:
+                type: object
+                properties:
+                  shape: { type: string }
+                  cross_facing: { type: string, enum: [up, side] }
+                  label: { type: string }
+                  count: { type: integer }
+                  avg_ms: { type: number }
+                  median_ms: { type: number }
+                  avg_moves: { type: number }
+                  avg_extra: { type: [number, "null"], description: 標準手順より多く回した手数の平均（ケースを判定できたペアだけ） }
+                  avg_cancelled: { type: number }
+                  avg_moves_to_pair: { type: number }
+                  rewrong: { type: integer }
+                  broke_other: { type: integer }
+                  share_ms: { type: number, description: F2L 全体の時間に占める割合（%） }
+            f2l_cases:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  moves: { type: integer }
+                  shape: { type: string }
+                  cross_facing: { type: string }
+                  count: { type: integer }
+                  avg_ms: { type: number }
+                  avg_moves: { type: number }
+                  avg_extra: { type: number }
+                  rewrong: { type: integer }
+            oll: { type: array, items: { $ref: "#/components/schemas/StageLastLayerStat" } }
+            pll: { type: array, items: { $ref: "#/components/schemas/StageLastLayerStat" } }
+
+    StageCaseRef:
+      type: object
+      properties:
+        id: { type: string, description: 判定できなかったときは空 }
+        name: { type: string }
+        moves: { type: integer, description: 標準手順の手数（180度は2手） }
+
+    StagePair:
+      type: object
+      description: F2L の1ペア（1段階）
+      properties:
+        stage: { type: string }
+        slot: { type: string, description: スロットの2色（例 緑・赤） }
+        case: { oneOf: [{ $ref: "#/components/schemas/StageCaseRef" }, { type: "null" }], description: 始めたときのケース（41ケースに当てはまらなければ null） }
+        shape:
+          type: string
+          description: 始めたときの形。paired / wrong（隣り合っているが色が合っていない）/ apart、または c-{U|own|other}/e-{U|own|other}
+        cross_facing: { type: string, enum: [up, side], description: 角が上段にあるときのクロスの色の向き }
+        ms: { type: integer }
+        recognition_ms: { type: integer }
+        moves: { type: integer }
+        net_moves: { type: integer, description: 打ち消しのあとの手数（180度は2手） }
+        cancelled: { type: integer }
+        moves_to_pair: { type: integer, description: 上段でペアができるまでの手数（作らずに入ったら 0） }
+        path: { type: array, items: { type: string }, description: 形の移り変わり }
+        rewrong: { type: boolean, description: 離したあと、また色が合わないままくっついたか }
+        broke_other: { type: boolean, description: 一度入ったのに、ほかのペアかクロスを崩していて段階が終わらなかったか }
+
+    StageLastLayer:
+      type: object
+      description: OLL か PLL の段階
+      properties:
+        stage: { type: string }
+        ms: { type: integer }
+        recognition_ms: { type: integer }
+        moves: { type: integer }
+        net_moves: { type: integer }
+        steps: { type: array, items: { $ref: "#/components/schemas/StageCaseRef" }, description: 手順の切れ目ごとのケース（最初が始めたとき） }
+        repeated: { type: boolean, description: 同じケースが2回以上出てきたか }
+
+    StageLastLayerStat:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        moves: { type: integer }
+        count: { type: integer }
+        avg_ms: { type: number }
+        avg_steps: { type: number }
+        repeated: { type: integer }
 
     SaveAnalysisRequest:
       type: object
