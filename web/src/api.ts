@@ -217,3 +217,54 @@ export function getAnalysis(id: number): Promise<Analysis> {
 export function deleteAnalysis(id: number): Promise<void> {
   return request(`/api/analyses/${id}`, { method: 'DELETE' })
 }
+
+export type StageCaseRef = { id: string; name: string; moves?: number }
+
+/** F2L ケースごとの集計（フルソルブの各ペアを始めたときのケース）。 */
+export type StageF2LCaseStat = StageCaseRef & {
+  shape: string
+  cross_facing?: string
+  count: number
+  avg_ms: number
+  avg_recognition_ms: number
+  avg_moves: number
+  /** 標準手順より多く回した手数の平均。 */
+  avg_extra: number
+  /** 色が合わないまま、またくっついた回数。 */
+  rewrong: number
+}
+
+/** OLL・PLL の、始めたときのケースごとの集計。 */
+export type StageLastLayerStat = StageCaseRef & {
+  count: number
+  avg_ms: number
+  avg_recognition_ms: number
+  avg_moves: number
+  /** 1つの手順で揃えた回の、標準手順より多く回した手数の平均（AUF 込み）。 */
+  avg_extra: number | null
+  /** 手順の数の平均（1 なら毎回 1-look）。 */
+  avg_steps: number
+  /** やり直した回数。 */
+  repeated: number
+}
+
+export type StageCaseSummary = {
+  cross_color: string
+  solve_ids: number[]
+  summary: {
+    pairs: number
+    f2l_cases: StageF2LCaseStat[]
+    oll: StageLastLayerStat[]
+    pll: StageLastLayerStat[]
+  }
+}
+
+/** フルソルブを再生して求めた、段階ごとのケースの集計（ソルブごとの判定は省く）。 */
+export function getStageCaseSummary(f: { mode?: SolveMode; from?: string; to?: string; limit?: number }): Promise<StageCaseSummary> {
+  const q = new URLSearchParams({ view: 'summary' })
+  if (f.mode) q.set('mode', f.mode)
+  if (f.from) q.set('from', f.from)
+  if (f.to) q.set('to', f.to)
+  if (f.limit !== undefined) q.set('limit', String(f.limit))
+  return request(`/api/stage-cases?${q}`)
+}

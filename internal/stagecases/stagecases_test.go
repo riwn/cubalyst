@@ -211,6 +211,40 @@ func TestAnalyzeLastLayer(t *testing.T) {
 	}
 }
 
+// OLL・PLL の集計：認識は最初の手まで、多い手数は1つの手順で揃えた回だけ
+func TestSummaryLastLayer(t *testing.T) {
+	cs := loadCases(t, openDB(t))
+	// キューブの記録と同じく 180度は2手
+	tperm := "R U R' U' R' F R R U' R' U' R U R' F'"
+	ua := "R U' R U R U R U' R' U' R R"
+	n := len(strings.Fields(tperm))
+	one := solveOf(t, tperm, []solves.Split{stage("pll", 0, n)})
+	// 2-look（T パームのあとに Ua）。段階の始まりを 300ms 早めて、認識を 800ms にする
+	two := solveOf(t, tperm+" "+ua, nil)
+	two.ID = 2
+	sp := stage("pll", 0, len(two.Moves))
+	sp.StartMS = -300
+	two.Splits = []solves.Split{sp}
+	r, err := AnalyzeAll([]solves.Solve{one, two, one}, cs, "yellow")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Summary.PLL) != 2 {
+		t.Fatalf("pll = %+v", r.Summary.PLL)
+	}
+	tst, other := r.Summary.PLL[0], r.Summary.PLL[1]
+	if tst.ID != "pll-T" || tst.Count != 2 || tst.AvgRecognitionMS != 500 || tst.AvgMoves != float64(n) || tst.AvgSteps != 1 {
+		t.Errorf("T = %+v", tst)
+	}
+	if tst.AvgExtra == nil || *tst.AvgExtra != 0 {
+		t.Errorf("T extra = %v", tst.AvgExtra)
+	}
+	// 2-look の回は多い手数に入れない
+	if other.Count != 1 || other.AvgRecognitionMS != 800 || other.AvgSteps != 2 || other.AvgExtra != nil {
+		t.Errorf("2-look = %+v", other)
+	}
+}
+
 func TestAnalyzeCrossColorWhite(t *testing.T) {
 	cs := loadCases(t, openDB(t))
 	// クロスが白（キューブ自身の U）のとき：x2 で持ち替えて見る。キューブ自身の向きでの R D R' は、見た向きでの R U R'

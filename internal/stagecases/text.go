@@ -89,13 +89,13 @@ func Text(r Result) string {
 		}
 		if len(sum.F2LCases) > 0 {
 			b.WriteString("\n## F2L：ケースごと（多い順。2回以上）\n")
-			b.WriteString("| ケース | 形 | 回数 | 平均時間 | 平均手数 | 標準手順 | 多い手数 | また色違い |\n|---|---|---|---|---|---|---|---|\n")
+			b.WriteString("| ケース | 形 | 回数 | 平均時間 | 認識 | 平均手数 | 標準手順 | 多い手数 | また色違い |\n|---|---|---|---|---|---|---|---|---|\n")
 			for _, c := range sum.F2LCases {
 				if c.Count < 2 {
 					continue
 				}
-				fmt.Fprintf(&b, "| %s | %s | %d | %s | %.1f | %d | %+.1f | %d |\n",
-					c.Name, ShapeLabel(c.Shape, c.CrossFacing), c.Count, secs(c.AvgMS), c.AvgMoves, c.Moves, c.AvgExtra, c.Rewrong)
+				fmt.Fprintf(&b, "| %s | %s | %d | %s | %s | %.1f | %d | %+.1f | %d |\n",
+					c.Name, ShapeLabel(c.Shape, c.CrossFacing), c.Count, secs(c.AvgMS), secs(c.AvgRecognitionMS), c.AvgMoves, c.Moves, c.AvgExtra, c.Rewrong)
 			}
 		}
 		for _, x := range []struct {
@@ -106,13 +106,18 @@ func Text(r Result) string {
 				continue
 			}
 			fmt.Fprintf(&b, "\n## %s：始めたときのケースごと\n", x.name)
-			b.WriteString("| ケース | 回数 | 平均時間 | 平均の手順の数 | やり直し |\n|---|---|---|---|---|\n")
+			b.WriteString("| ケース | 回数 | 平均時間 | 認識 | 平均手数 | 標準手順より多い手数（1-look、AUF 込み） | 平均の手順の数 | やり直し |\n|---|---|---|---|---|---|---|---|\n")
 			for _, s := range x.list {
 				name := s.Name
 				if s.ID == "" {
 					name = "判定できない形"
 				}
-				fmt.Fprintf(&b, "| %s | %d | %s | %.1f | %d |\n", name, s.Count, secs(s.AvgMS), s.AvgSteps, s.Repeated)
+				extra := "-"
+				if s.AvgExtra != nil {
+					extra = fmt.Sprintf("%+.1f", *s.AvgExtra)
+				}
+				fmt.Fprintf(&b, "| %s | %d | %s | %s | %.1f | %s | %.1f | %d |\n",
+					name, s.Count, secs(s.AvgMS), secs(s.AvgRecognitionMS), s.AvgMoves, extra, s.AvgSteps, s.Repeated)
 			}
 		}
 	}

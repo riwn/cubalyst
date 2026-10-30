@@ -1833,3 +1833,23 @@ button.danger-solid {
 .assist-setup {
   color: var(--mute);
 }
+
+/* 統計のケース別：表は横にはみ出したら、その中でスクロールする */
+.case-stats-scroll {
+  overflow-x: auto;
+}
+
+.case-stats .splits-table td.case-stats-diagram {
+  width: 44px;
+  padding: 2px 4px;
+}
+
+.case-stats .splits-table td.case-stats-slow {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+/* 名前とメモは折り返さない（狭い画面では表の中で横にスクロールする） */
+.case-stats .splits-table .left {
+  white-space: nowrap;
+}

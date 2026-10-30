@@ -3,8 +3,9 @@ import { Link } from 'react-router'
 import { listAnalyses, type Analysis, type SolveMode } from '../api'
 import { AnalysisHowTo } from '../components/AnalysisCard'
 import { AnalysisTabs } from '../components/AnalysisTabs'
+import { CaseStatsPanel } from '../components/CaseStatsPanel'
 import { HistogramChart, TrendChart } from '../components/charts'
-import { formatDate, MODE_LABELS, multiTitle } from '../format'
+import { formatDate, isFullSolve, MODE_LABELS, multiTitle } from '../format'
 import { bests, histogram, stageStats, trend } from '../solve/aggregate'
 import { GROUP_LABELS, STAGE_LABELS, STAGES, type StageGroup } from '../solve/cfop'
 import { useSolveList } from '../solve/hooks'
@@ -40,7 +41,7 @@ function nextDayIso(date: string): string {
   return d.toISOString()
 }
 
-/** 統計：ベスト記録、推移、分布、段階別統計。 */
+/** 統計：ベスト記録、推移、分布、段階別統計、ケース別統計（フルソルブ）。 */
 export function StatsPage() {
   const [mode, setMode] = useState<SolveMode>('full')
   const [period, setPeriod] = useState<Period>('all')
@@ -234,6 +235,8 @@ export function StatsPage() {
               </table>
             </section>
           )}
+
+          {isFullSolve(mode) && <CaseStatsPanel mode={mode} from={range.from} to={range.to} />}
         </>
       )}
 

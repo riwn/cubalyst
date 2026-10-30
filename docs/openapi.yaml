@@ -253,6 +253,7 @@ paths:
         - $ref: "#/components/parameters/from"
         - $ref: "#/components/parameters/to"
         - { name: limit, in: query, description: 新しい方から何件, schema: { type: integer, minimum: 0 } }
+        - { name: view, in: query, description: summary ならソルブごとの判定（solves）を空にして集計だけ返す, schema: { type: string, enum: [full, summary], default: full } }
       responses:
         "200":
           description: ソルブごとの判定と集計
@@ -763,6 +764,7 @@ components:
                   count: { type: integer }
                   avg_ms: { type: number }
                   median_ms: { type: number }
+                  avg_recognition_ms: { type: number, description: 最初の手までの時間の平均 }
                   avg_moves: { type: number }
                   avg_extra: { type: [number, "null"], description: 標準手順より多く回した手数の平均（ケースを判定できたペアだけ） }
                   avg_cancelled: { type: number }
@@ -782,6 +784,7 @@ components:
                   cross_facing: { type: string }
                   count: { type: integer }
                   avg_ms: { type: number }
+                  avg_recognition_ms: { type: number, description: 最初の手までの時間の平均 }
                   avg_moves: { type: number }
                   avg_extra: { type: number }
                   rewrong: { type: integer }
@@ -836,6 +839,9 @@ components:
         moves: { type: integer }
         count: { type: integer }
         avg_ms: { type: number }
+        avg_recognition_ms: { type: number, description: 最初の手までの時間の平均 }
+        avg_moves: { type: number }
+        avg_extra: { type: [number, "null"], description: 1つの手順で揃えた回の、標準手順より多く回した手数の平均（AUF 込み）。そういう回が無ければ null }
         avg_steps: { type: number }
         repeated: { type: integer }
 
