@@ -268,3 +268,39 @@ export function getStageCaseSummary(f: { mode?: SolveMode; from?: string; to?: s
   if (f.limit !== undefined) q.set('limit', String(f.limit))
   return request(`/api/stage-cases?${q}`)
 }
+
+/** F2L の1ペア（1段階）の判定。 */
+export type StagePair = {
+  stage: string
+  /** スロットの2色（例 緑・赤）。 */
+  slot: string
+  case: StageCaseRef | null
+  shape: string
+  ms: number
+  recognition_ms: number
+  moves: number
+  rewrong: boolean
+}
+
+/** OLL か PLL の段階の判定。steps は手順の切れ目ごとのケース（最初が始めたとき）。 */
+export type StageLastLayer = {
+  stage: string
+  ms: number
+  recognition_ms: number
+  moves: number
+  steps: StageCaseRef[]
+  repeated: boolean
+}
+
+export type StageSolve = {
+  id: number
+  pairs: StagePair[]
+  oll?: StageLastLayer
+  pll?: StageLastLayer
+}
+
+/** 1回のソルブの、段階ごとのケースの判定。 */
+export async function getSolveStageCases(id: number): Promise<StageSolve | undefined> {
+  const r: { solves: StageSolve[] } = await request(`/api/stage-cases?ids=${id}`)
+  return r.solves[0]
+}

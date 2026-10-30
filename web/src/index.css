@@ -1853,3 +1853,28 @@ button.danger-solid {
 .case-stats .splits-table .left {
   white-space: nowrap;
 }
+
+/* ソルブ詳細の「この手順なら速かった」 */
+.loss-hint-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.loss-hint-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.loss-hint-saved {
+  font-family: var(--font-num);
+  font-weight: 700;
+  color: var(--warn);
+}
+
+.target-panel td.target-focus {
+  color: var(--warn);
+  font-weight: 700;
+}
