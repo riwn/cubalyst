@@ -406,6 +406,19 @@ code {
   flex: none;
 }
 
+/* 計測する画面は文字を選ばせない（マウスが乗っても縦線のカーソルを出さない） */
+.fit-screen {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+.fit-screen :is(input, textarea, select) {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: auto;
+}
+
 .fit-layout {
   position: relative;
 }
