@@ -42,12 +42,18 @@ function saveTarget(id: string, sec: number) {
   }
 }
 
-/** 手順練習：ケースと手順を1つ選び、その手順を何度も回して1回ごとの時間を測る。 */
-export function AlgDrillPage() {
+/** ケース ID（oll-…・pll-…・f2l-…）の手順の種類。 */
+function setOf(id: string | null | undefined): SetName | undefined {
+  const set = id?.split('-')[0].toUpperCase()
+  return SETS.find((s) => s === set)
+}
+
+/** 手順練習：ケースと手順を1つ選び、その手順を何度も回して1回ごとの時間を測る。initialCaseId を渡すと、そのケースを選んで開く。 */
+export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null } = {}) {
   const [cases, setCases] = useState<CaseInfo[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<SetName>('OLL')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [tab, setTab] = useState<SetName>(() => setOf(initialCaseId) ?? 'OLL')
+  const [selectedId, setSelectedId] = useState<string | null>(() => (setOf(initialCaseId) ? initialCaseId! : null))
   const [running, setRunning] = useState(false)
   const [chosenAlg, setChosenAlg] = useState<Record<string, string>>({})
   const history = useSolveList({ mode: 'case', limit: 0 })

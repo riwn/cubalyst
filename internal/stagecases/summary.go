@@ -33,7 +33,9 @@ type ShapeStat struct {
 	Count       int     `json:"count"`
 	AvgMS       float64 `json:"avg_ms"`
 	MedianMS    float64 `json:"median_ms"`
-	AvgMoves    float64 `json:"avg_moves"`
+	// AvgRecognitionMS は最初の手までの時間の平均。
+	AvgRecognitionMS float64 `json:"avg_recognition_ms"`
+	AvgMoves         float64 `json:"avg_moves"`
 	// AvgExtra は、標準手順の手数より多く回した手数の平均（ケースを判定できたペアだけ）。判定できたペアが無ければ nil。
 	AvgExtra     *float64 `json:"avg_extra"`
 	AvgCancelled float64  `json:"avg_cancelled"`
@@ -52,17 +54,24 @@ type CaseStat struct {
 	CrossFacing string  `json:"cross_facing,omitempty"`
 	Count       int     `json:"count"`
 	AvgMS       float64 `json:"avg_ms"`
-	AvgMoves    float64 `json:"avg_moves"`
-	AvgExtra    float64 `json:"avg_extra"`
-	Rewrong     int     `json:"rewrong"`
+	// AvgRecognitionMS は最初の手までの時間の平均。
+	AvgRecognitionMS float64 `json:"avg_recognition_ms"`
+	AvgMoves         float64 `json:"avg_moves"`
+	AvgExtra         float64 `json:"avg_extra"`
+	Rewrong          int     `json:"rewrong"`
 }
 
 // LLStat は OLL・PLL の始めたときのケースごとの集計。
 type LLStat struct {
 	CaseRef
-	Count    int     `json:"count"`
-	AvgMS    float64 `json:"avg_ms"`
-	AvgSteps float64 `json:"avg_steps"`
+	Count int     `json:"count"`
+	AvgMS float64 `json:"avg_ms"`
+	// AvgRecognitionMS は最初の手までの時間の平均。
+	AvgRecognitionMS float64 `json:"avg_recognition_ms"`
+	AvgMoves         float64 `json:"avg_moves"`
+	// AvgExtra は、1つの手順で揃えた回について、標準手順の手数より多く回した手数の平均。そういう回が無ければ nil。
+	AvgExtra *float64 `json:"avg_extra"`
+	AvgSteps float64  `json:"avg_steps"`
 	// Repeated は、同じケースが2回以上出てきた（やり直した）回数。
 	Repeated int `json:"repeated"`
 }
@@ -112,9 +121,10 @@ func summarize(list []Solve) Summary {
 	}
 	for k, g := range byShape {
 		st := ShapeStat{Shape: k.shape, CrossFacing: k.facing, Label: ShapeLabel(k.shape, k.facing), Count: len(g)}
-		var ms, mv, canc, extra, toPair []float64
+		var ms, rec, mv, canc, extra, toPair []float64
 		for _, p := range g {
 			ms = append(ms, float64(p.MS))
+			rec = append(rec, float64(p.RecognitionMS))
 			mv = append(mv, float64(p.Moves))
 			canc = append(canc, float64(p.Cancelled))
 			if p.Case != nil {
@@ -130,7 +140,8 @@ func summarize(list []Solve) Summary {
 				st.BrokeOther++
 			}
 		}
-		st.AvgMS, st.MedianMS, st.AvgMoves, st.AvgCancelled, st.AvgMovesToPair = mean(ms), median(ms), mean(mv), mean(canc), mean(toPair)
+		st.AvgMS, st.MedianMS, st.AvgRecognitionMS = mean(ms), median(ms), mean(rec)
+		st.AvgMoves, st.AvgCancelled, st.AvgMovesToPair = mean(mv), mean(canc), mean(toPair)
 		if len(extra) > 0 {
 			e := mean(extra)
 			st.AvgExtra = &e
@@ -145,16 +156,17 @@ func summarize(list []Solve) Summary {
 	})
 	for _, g := range byCase {
 		c := CaseStat{CaseRef: *g[0].Case, Shape: g[0].Shape, CrossFacing: g[0].CrossFacing, Count: len(g)}
-		var ms, mv, extra []float64
+		var ms, rec, mv, extra []float64
 		for _, p := range g {
 			ms = append(ms, float64(p.MS))
+			rec = append(rec, float64(p.RecognitionMS))
 			mv = append(mv, float64(p.Moves))
 			extra = append(extra, float64(p.Moves-p.Case.Moves))
 			if p.Rewrong {
 				c.Rewrong++
 			}
 		}
-		c.AvgMS, c.AvgMoves, c.AvgExtra = mean(ms), mean(mv), mean(extra)
+		c.AvgMS, c.AvgRecognitionMS, c.AvgMoves, c.AvgExtra = mean(ms), mean(rec), mean(mv), mean(extra)
 		sum.F2LCases = append(sum.F2LCases, c)
 	}
 	slices.SortFunc(sum.F2LCases, func(a, b CaseStat) int {
@@ -177,15 +189,24 @@ func llStats(list []*LastLayer) []LLStat {
 	for _, id := range order {
 		g := by[id]
 		st := LLStat{CaseRef: g[0].Steps[0], Count: len(g)}
-		var ms, steps []float64
+		var ms, rec, mv, steps, extra []float64
 		for _, ll := range g {
 			ms = append(ms, float64(ll.MS))
+			rec = append(rec, float64(ll.RecognitionMS))
+			mv = append(mv, float64(ll.Moves))
 			steps = append(steps, float64(len(ll.Steps)))
+			if len(ll.Steps) == 1 && ll.Steps[0].ID != "" {
+				extra = append(extra, float64(ll.Moves-ll.Steps[0].Moves))
+			}
 			if ll.Repeated {
 				st.Repeated++
 			}
 		}
-		st.AvgMS, st.AvgSteps = mean(ms), mean(steps)
+		st.AvgMS, st.AvgRecognitionMS, st.AvgMoves, st.AvgSteps = mean(ms), mean(rec), mean(mv), mean(steps)
+		if len(extra) > 0 {
+			e := mean(extra)
+			st.AvgExtra = &e
+		}
 		out = append(out, st)
 	}
 	slices.SortFunc(out, func(a, b LLStat) int {
