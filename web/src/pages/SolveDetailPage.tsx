@@ -12,6 +12,7 @@ import {
 } from '../api'
 import { AnalysisCard, AnalysisHowTo } from '../components/AnalysisCard'
 import { StepShareDonut } from '../components/charts'
+import { LossHints } from '../components/LossHints'
 import { ConfirmDialog } from '../ui/Dialog'
 import { KebabMenu } from '../ui/Popover'
 import { NotationLine, SplitsTable } from '../components/SplitsTable'
@@ -143,6 +144,8 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
         )}
         <HoldsNote solve={solve} />
       </section>
+
+      {isFullSolve(solve.mode) && (solve.splits ?? []).length > 0 && <LossHints solveId={solve.id} />}
 
       <section className="panel">
         <h3>メモ</h3>

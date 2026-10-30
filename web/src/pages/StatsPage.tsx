@@ -4,6 +4,7 @@ import { listAnalyses, type Analysis, type SolveMode } from '../api'
 import { AnalysisHowTo } from '../components/AnalysisCard'
 import { AnalysisTabs } from '../components/AnalysisTabs'
 import { CaseStatsPanel } from '../components/CaseStatsPanel'
+import { TargetPanel } from '../components/TargetPanel'
 import { HistogramChart, TrendChart } from '../components/charts'
 import { formatDate, isFullSolve, MODE_LABELS, multiTitle } from '../format'
 import { bests, histogram, stageStats, trend } from '../solve/aggregate'
@@ -41,7 +42,7 @@ function nextDayIso(date: string): string {
   return d.toISOString()
 }
 
-/** 統計：ベスト記録、推移、分布、段階別統計、ケース別統計（フルソルブ）。 */
+/** 統計：ベスト記録、推移、分布、段階別統計、目標タイムとケース別統計（フルソルブ）。 */
 export function StatsPage() {
   const [mode, setMode] = useState<SolveMode>('full')
   const [period, setPeriod] = useState<Period>('all')
@@ -235,6 +236,8 @@ export function StatsPage() {
               </table>
             </section>
           )}
+
+          {isFullSolve(mode) && stages.count > 0 && <TargetPanel solves={solves} />}
 
           {isFullSolve(mode) && <CaseStatsPanel mode={mode} from={range.from} to={range.to} />}
         </>
