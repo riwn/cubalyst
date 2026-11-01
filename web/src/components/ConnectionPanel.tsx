@@ -3,6 +3,7 @@ import { canWatchAdvertisements, connectBluetoothCube, isWebBluetoothAvailable, 
 import { useCubeState, useCubeStore } from '../cube/hooks'
 import { MockConnection } from '../cube/mock'
 import type { GyroStatus } from '../cube/store'
+import { useScreenWakeLock } from '../cube/wake-lock'
 import { useSettings } from '../settings/hooks'
 import { useDebug } from '../ui/prefs'
 import { Dialog } from '../ui/Dialog'
@@ -136,6 +137,8 @@ function gyroNotice(useGyro: boolean, status: GyroStatus): { text: string; warn:
 export function CubeNotices() {
   const store = useCubeStore()
   const state = useCubeState()
+  // キューブを触っている間（つながっている間）は、画面が消えないようにする
+  useScreenWakeLock(state.status === 'connected')
   return (
     <>
       {state.error && (
