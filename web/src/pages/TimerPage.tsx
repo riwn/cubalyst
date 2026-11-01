@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { CubeView } from '../components/CubeView'
 import { FitLayout } from '../components/FitLayout'
 import { GyroDebug } from '../components/GyroDebug'
@@ -6,6 +6,7 @@ import { ManualTimer } from '../components/ManualTimer'
 import { MockControls } from '../components/MockControls'
 import { MoveLog } from '../components/MoveLog'
 import { RecentSolves } from '../components/RecentSolves'
+import { ScreenshotButton } from '../components/ScreenshotButton'
 import { ScrambleDisplay } from '../components/ScrambleDisplay'
 import { StageRibbon } from '../components/StageRibbon'
 import { TimerDisplay } from '../components/TimerDisplay'
@@ -35,6 +36,7 @@ export function TimerPage() {
   const state = useSessionState(session)
   const { status } = useCubeState()
   const debug = useDebug()
+  const screen = useRef<HTMLDivElement>(null)
   const last = state?.last
   const lastSplits = useMemo(
     () => (last ? withSplits(store.kpuzzle, last, settings.cross_color).splits : undefined),
@@ -43,6 +45,7 @@ export function TimerPage() {
 
   return (
     <FitLayout
+      ref={screen}
       className="timer-page"
       main={
         <>
@@ -66,7 +69,12 @@ export function TimerPage() {
           {saveError && <p className="error">{saveError}</p>}
         </>
       }
-      cube={<CubeView />}
+      cube={
+        <>
+          <CubeView />
+          <ScreenshotButton target={screen} />
+        </>
+      }
       sideLabel="直近の記録"
       side={
         <>

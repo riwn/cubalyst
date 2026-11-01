@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type ReactNode, type Ref } from 'react'
 
 /**
  * 計測する画面の配置。スクロールせずに1画面へ収める。
@@ -11,16 +11,18 @@ export function FitLayout({
   cube,
   side,
   sideLabel = '記録',
+  ref,
 }: {
   className?: string
   main: ReactNode
   cube: ReactNode
   side?: ReactNode
   sideLabel?: string
+  ref?: Ref<HTMLDivElement>
 }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className={`fit-screen fit-layout ${open ? 'fit-layout--side-open' : ''} ${className}`}>
+    <div ref={ref} className={`fit-screen fit-layout ${open ? 'fit-layout--side-open' : ''} ${className}`}>
       <div className="fit-main">{main}</div>
       <div className="fit-cube">{cube}</div>
       {side && (
