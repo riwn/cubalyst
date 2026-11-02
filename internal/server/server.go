@@ -16,6 +16,7 @@ import (
 	"github.com/riwn/cubalyst/docs"
 	"github.com/riwn/cubalyst/internal/analysis"
 	"github.com/riwn/cubalyst/internal/db"
+	"github.com/riwn/cubalyst/internal/live"
 	"github.com/riwn/cubalyst/internal/settings"
 	"github.com/riwn/cubalyst/internal/solves"
 )
@@ -27,6 +28,7 @@ type Server struct {
 	solves    *solves.Store
 	settings  *settings.Store
 	analysis  *analysis.Service
+	live      *live.Hub
 }
 
 // New はサーバーを作る。
@@ -37,7 +39,13 @@ func New(database *sql.DB, staticDir string) *Server {
 		solves:    solves.NewStore(database),
 		settings:  settings.NewStore(database),
 		analysis:  analysis.NewService(database),
+		live:      live.NewHub(),
 	}
+}
+
+// Close は、つなぎっぱなしの接続（タイマー画面の中継）を切る。http.Server の RegisterOnShutdown に渡す。
+func (s *Server) Close() {
+	s.live.Close()
 }
 
 // Handler はルーティング済みのハンドラを返す。
@@ -66,6 +74,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/analysis-input", s.handleMultiAnalysisInput)
 	mux.HandleFunc("GET /api/stage-cases", s.handleStageCases)
 	mux.HandleFunc("GET /api/stats/practice", s.handlePracticeStats)
+	mux.HandleFunc("POST /api/live/events", s.handleLiveEvents)
+	mux.HandleFunc("GET /api/live/stream", s.handleLiveStream)
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 	})
@@ -140,7 +150,8 @@ func logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		next.ServeHTTP(w, r)
-		if strings.HasPrefix(r.URL.Path, "/api/") {
+		// タイマー画面の中継は1手ごとに届くので、ログに残さない
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/live/events" {
 			log.Printf("%s %s (%s)", r.Method, r.URL.Path, time.Since(start).Round(time.Microsecond))
 		}
 	})

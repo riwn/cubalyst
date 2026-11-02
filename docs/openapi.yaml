@@ -28,6 +28,8 @@ tags:
   - name: 入出力
   - name: 集計
     description: 期間の練習の集計。文面にするのは呼ぶ側（通知の本文を作る kawaraban など）
+  - name: 中継
+    description: キューブをつないだブラウザ（メイン）のタイマー画面を、ほかのブラウザ（`/live`）に映す。状態はサーバーのメモリにだけ持つ
   - name: その他
 
 paths:
@@ -467,6 +469,46 @@ paths:
               schema: { $ref: "#/components/schemas/PracticeStats" }
         "400": { $ref: "#/components/responses/BadRequest" }
 
+  /api/live/events:
+    post:
+      tags: [中継]
+      summary: メインのタイマー画面の出来事を送る
+      description: |
+        キューブをつないだブラウザ（メイン）が、タイマー画面の出来事を順に送る。見る側（`GET /api/live/stream`）にそのまま流す。
+        何もなくても15秒ごとに送り（`events` は空でよい）、40秒届かなければメインはいなくなったとみなす。
+        メインは1つの前提で、2つのブラウザから送ると混ざる。
+      operationId: publishLiveEvents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  items: { $ref: "#/components/schemas/LiveEvent" }
+      responses:
+        "204": { description: 受け取った }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/live/stream:
+    get:
+      tags: [中継]
+      summary: メインのタイマー画面の状態を受け取り続ける（SSE）
+      description: |
+        Server-Sent Events。各出来事は `data:` の1行の JSON（LiveMessage）。
+        最初に今の状態（`snapshot`）を送り、そのあとメインから届いた出来事と、15秒ごとの `ping` を送る。
+        読むのが遅いと切るので、つなぎ直す（EventSource は自動でつなぎ直し、また `snapshot` から受け取る）。
+      operationId: liveStream
+      responses:
+        "200":
+          description: 出来事の流れ
+          content:
+            text/event-stream:
+              schema: { $ref: "#/components/schemas/LiveMessage" }
+
 components:
   parameters:
     period:
@@ -517,6 +559,52 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
 
   schemas:
+    LiveEvent:
+      type: object
+      description: |
+        メインから届く出来事。
+        - main：キューブの接続の状態（cube）
+        - move：1手の回転（move）と、回したあとの状態（facelets）
+        - facelets：状態の置き換え（実機に合わせ直したときなど）
+        - session：タイマーの状態（LiveSession）
+        - bye：メインが画面を閉じた
+      required: [type]
+      properties:
+        type: { type: string, enum: [main, move, facelets, session, bye] }
+        cube: { type: string, enum: [connected, connecting, disconnected] }
+        move: { type: string, example: "R'" }
+        facelets:
+          type: string
+          description: キューブの状態。URFDLB の54文字（Kociemba の並び）
+          example: UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB
+        session: { $ref: "#/components/schemas/LiveSession" }
+    LiveMessage:
+      type: object
+      description: |
+        見る側に送る出来事。LiveEvent の main・move・facelets・session をそのまま送るほか、
+        - snapshot：見始めたときの今の状態（online・cube・facelets・session・age_ms）
+        - ping：メインが生きているか（online）
+        - main：bye のときは online=false で送る
+      required: [type]
+      properties:
+        type: { type: string, enum: [snapshot, ping, main, move, facelets, session] }
+        online: { type: boolean, description: メインがいるか }
+        cube: { type: string, enum: [connected, connecting, disconnected] }
+        move: { type: string }
+        facelets: { type: string }
+        session: { $ref: "#/components/schemas/LiveSession" }
+        age_ms: { type: integer, description: session を受け取ってからの時間（snapshot のときだけ）。経過時間をずらすのに使う }
+    LiveSession:
+      type: object
+      description: |
+        タイマーの状態。中身は画面（web/src/live/protocol.ts）が決め、サーバーは確かめずにそのまま流す。
+        時刻は端末ごとに基準が違うので、`*_ago_ms`（送った時点で、計測やインスペクションが始まってから何 ms たったか）で送る。
+      additionalProperties: true
+      properties:
+        phase: { type: string, enum: [generating, scrambling, ready, running] }
+        scramble: { type: [string, "null"] }
+        started_ago_ms: { type: [integer, "null"] }
+        ready_ago_ms: { type: [integer, "null"] }
     PracticeStats:
       type: object
       required: [period, count, full, stages, days, practice]

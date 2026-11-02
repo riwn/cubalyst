@@ -11,6 +11,7 @@ import { ScrambleDisplay } from '../components/ScrambleDisplay'
 import { StageRibbon } from '../components/StageRibbon'
 import { TimerDisplay } from '../components/TimerDisplay'
 import { useCubeState, useCubeStore } from '../cube/hooks'
+import { useLivePublish } from '../live/hooks'
 import { useSettings } from '../settings/hooks'
 import { withSplits } from '../solve/cfop'
 import { fullSolveSource } from '../solve/exercises'
@@ -35,6 +36,8 @@ export function TimerPage() {
   )
   const state = useSessionState(session)
   const { status } = useCubeState()
+  // キューブがつながっている間は、ほかのブラウザ（/live）に画面を映す
+  useLivePublish(session, status === 'connected')
   const debug = useDebug()
   const screen = useRef<HTMLDivElement>(null)
   const last = state?.last

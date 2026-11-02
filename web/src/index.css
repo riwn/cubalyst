@@ -599,6 +599,21 @@ code {
   text-align: center;
 }
 
+/* 中継：メインを映しているかの一行。映している間は緑の点を付ける */
+.live-status {
+  margin: 8px 0 0;
+}
+
+.live-status--on::before {
+  content: '';
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  margin-right: 0.4em;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
 /* スクランブル：画面上部に左寄せ。済んだ手は薄く、次の手は黄面の下線 */
 .scramble {
   margin: 8px 0 0;
