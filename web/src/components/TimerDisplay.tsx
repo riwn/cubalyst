@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import { INSPECTION_DNF_MS, INSPECTION_MS, type SessionState } from '../solve/session'
 import { effectiveTime, formatTime } from '../solve/stats'
 
-/** 大きなタイマー表示。計測中は経過時間、それ以外は直前の記録。 */
-export function TimerDisplay({ state }: { state: SessionState }) {
+/**
+ * 大きなタイマー表示。計測中は経過時間、それ以外は直前の記録。
+ * lastMoveCount は直前の記録の手数（回転ログを持たない中継の画面で渡す。省くと回転ログの長さ）。
+ */
+export function TimerDisplay({ state, lastMoveCount }: { state: SessionState; lastMoveCount?: number }) {
   const { phase, startedAt, last, moveCount, readyAt, inspection } = state
   const inspecting = phase === 'ready' && inspection && readyAt != null
   const [now, setNow] = useState(() => performance.now())
@@ -47,7 +50,7 @@ export function TimerDisplay({ state }: { state: SessionState }) {
         : phase === 'scrambling'
           ? 'スクランブル中'
           : last
-            ? `${last.moves?.length ?? 0}手`
+            ? `${lastMoveCount ?? last.moves?.length ?? 0}手`
             : ''
   }
   return (

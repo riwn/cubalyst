@@ -5,6 +5,7 @@ import { CubeConnectionControl, CubeNotices } from './components/ConnectionPanel
 import { CubeStoreProvider } from './cube/CubeStoreProvider'
 import { AnalysesPage, AnalysisDetailPage } from './pages/AnalysesPage'
 import { HistoryPage } from './pages/HistoryPage'
+import { LivePage } from './pages/LivePage'
 import { PracticePage } from './pages/PracticePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { SolveDetailPage } from './pages/SolveDetailPage'
@@ -34,6 +35,16 @@ const NAV: { to: string; label: string; icon: ReactNode; end?: boolean; match?: 
         <circle cx="12" cy="12" r="9" />
         <circle cx="12" cy="12" r="5" />
         <circle cx="12" cy="12" r="1.2" />
+      </>
+    ),
+  },
+  {
+    to: '/live',
+    label: '中継',
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="2" />
+        <path d="M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8" />
       </>
     ),
   },
@@ -144,6 +155,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<TimerPage />} />
               <Route path="/practice" element={<PracticePage />} />
+              <Route path="/live" element={<LivePage />} />
               <Route path="/stats" element={<StatsPage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/analyses" element={<AnalysesPage />} />

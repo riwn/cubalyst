@@ -54,11 +54,14 @@ func run() error {
 	}
 	log.Printf("db: %s (schema version %d)", cfg.DBPath, v)
 
+	app := server.New(database, cfg.StaticDir)
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           server.New(database, cfg.StaticDir).Handler(),
+		Handler:           app.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+	// 止めるとき、タイマー画面の中継（SSE）の接続を切る。切らないと Shutdown が終わるのを待ち続ける
+	srv.RegisterOnShutdown(app.Close)
 	errCh := make(chan error, 1)
 	go func() {
 		log.Printf("listening on http://%s", cfg.Addr)
