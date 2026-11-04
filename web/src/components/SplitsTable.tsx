@@ -2,11 +2,7 @@ import type { SolveMove } from '../api'
 import { useHoldFrame } from '../settings/hooks'
 import { STAGE_LABELS, type Split } from '../solve/cfop'
 import { isRegrip, notationTokens, type HoldChange, type Holds, type NotationToken } from '../solve/holds'
-import { formatTime } from '../solve/stats'
-
-function tps(moves: number, ms: number): string {
-  return ms > 0 ? (moves / (ms / 1000)).toFixed(2) : '—'
-}
+import { formatTime, formatTps } from '../solve/stats'
 
 /** 持ち替えの所要時間（秒）と、ワイドムーブかもしれないことの説明。 */
 function rotationTitle(c: HoldChange): string {
@@ -77,7 +73,7 @@ export function SplitsTable({
               <td>{formatTime(ms, 3)}</td>
               <td>{totalMs > 0 ? `${Math.round((ms / totalMs) * 100)}%` : '—'}</td>
               <td>{s.move_count}</td>
-              <td>{tps(s.move_count, ms)}</td>
+              <td>{formatTps(s.move_count, ms)}</td>
               {holds && <td>{rots.length ? `${rots.length}（${(rotMs / 1000).toFixed(2)}）` : '—'}</td>}
               <td className="alg">{tokens.length ? <NotationLine tokens={tokens} /> : <span className="muted">(skip)</span>}</td>
             </tr>

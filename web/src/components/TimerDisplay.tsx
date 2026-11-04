@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { INSPECTION_DNF_MS, INSPECTION_MS, type SessionState } from '../solve/session'
-import { effectiveTime, formatTime } from '../solve/stats'
+import { effectiveTime, formatTime, formatTps } from '../solve/stats'
 
 /**
- * 大きなタイマー表示。計測中は経過時間、それ以外は直前の記録。
+ * 大きなタイマー表示。計測中は経過時間、それ以外は直前の記録と、その手数・TPS。
  * lastMoveCount は直前の記録の手数（回転ログを持たない中継の画面で渡す。省くと回転ログの長さ）。
  */
 export function TimerDisplay({ state, lastMoveCount }: { state: SessionState; lastMoveCount?: number }) {
@@ -25,6 +25,8 @@ export function TimerDisplay({ state, lastMoveCount }: { state: SessionState; la
   let time: string
   let hint: string
   let mod = ''
+  // 手数（直前の記録なら TPS も）。インスペクション中は空にする（行は残して高さを変えない）
+  let stats = ''
   if (inspecting) {
     // インスペクション：残り秒数。15秒を過ぎたら +2、17秒を過ぎたら DNF
     const elapsed = Math.max(0, now - readyAt)
@@ -41,21 +43,21 @@ export function TimerDisplay({ state, lastMoveCount }: { state: SessionState; la
     hint = 'インスペクション中：最初の回転でスタート'
   } else if (phase === 'running' && startedAt != null) {
     time = formatTime(Math.max(0, now - startedAt), 2)
-    hint = `${moveCount}手${state.inspectionPenalty ? `（インスペクション超過：${state.inspectionPenalty}）` : ''}`
+    stats = `${moveCount}手`
+    hint = state.inspectionPenalty ? `インスペクション超過：${state.inspectionPenalty}` : ''
   } else {
     time = last ? formatTime(effectiveTime(last.total_ms, last.penalty), 3) : '0.000'
-    hint =
-      phase === 'ready'
-        ? '準備OK：最初の回転でスタート'
-        : phase === 'scrambling'
-          ? 'スクランブル中'
-          : last
-            ? `${lastMoveCount ?? last.moves?.length ?? 0}手`
-            : ''
+    hint = phase === 'ready' ? '準備OK：最初の回転でスタート' : phase === 'scrambling' ? 'スクランブル中' : ''
+    if (last) {
+      const moves = lastMoveCount ?? last.moves?.length ?? 0
+      // TPS は +2 を含めない実測の時間で割る
+      stats = `${moves}手 ・ ${formatTps(moves, last.total_ms)} TPS`
+    }
   }
   return (
     <section className={`timer timer--${phase} ${mod}`}>
       <div className="timer-time">{time}</div>
+      <div className="timer-stats">{stats}</div>
       <div className="timer-hint">{hint}</div>
     </section>
   )

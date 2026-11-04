@@ -43,6 +43,11 @@ export function best(values: (number | null | undefined)[]): number | undefined 
 }
 
 /** 表示用の文字列。12.345 / 1:02.345 / DNF / -- */
+/** 1秒あたりの手数（TPS）。時間が 0 なら「—」。時間はペナルティを含めない実測の時間を渡す。 */
+export function formatTps(moves: number, ms: number): string {
+  return ms > 0 ? (moves / (ms / 1000)).toFixed(2) : '—'
+}
+
 export function formatTime(ms: number | null | undefined, digits: 2 | 3 = 2): string {
   if (ms === undefined) return '--'
   if (ms === null) return 'DNF'

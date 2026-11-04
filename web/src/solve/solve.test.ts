@@ -8,7 +8,7 @@ import { applyRotation } from './holds'
 import { invert, simplify } from './notation'
 import { ScrambleTracker } from './scramble-tracker'
 import { SolveSession, inspectionPenalty, isSolved, type Exercise } from './session'
-import { averageOf, effectiveTime, formatTime, rollingAverages } from './stats'
+import { averageOf, effectiveTime, formatTime, formatTps, rollingAverages } from './stats'
 
 const kpuzzle = await cube3x3x3.kpuzzle()
 const solved = kpuzzle.defaultPattern()
@@ -94,6 +94,11 @@ describe('stats', () => {
     expect(formatTime(62345)).toBe('1:02.34')
     expect(formatTime(null)).toBe('DNF')
     expect(formatTime(undefined)).toBe('--')
+  })
+
+  it('formatTps', () => {
+    expect(formatTps(52, 12620)).toBe('4.12')
+    expect(formatTps(0, 0)).toBe('—')
   })
 })
 
