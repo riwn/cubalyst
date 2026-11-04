@@ -46,6 +46,43 @@ export const ALT_ALGS: Record<string, string[]> = {
   'pll-Na': ["L U' R U2 L' U R' L U' R U2 L' U R'"],
   'pll-Nb': ["R' U L' U2 R U' L R' U L' U2 R U' L"],
   'pll-V': ["R' U R U' R' f' U' R U2 R' U' R U' R' f R"],
+  // F2L：F を使わない手順（標準手順が F を使うケースだけ）。R・U だけで解けるケースはその手順を先に、
+  // エッジの向きが悪く R・U だけでは解けないケースは、y で持ち替えて左手（L' U L など）で入れる手順。
+  'f2l-1': ["y L' U' L"],
+  'f2l-3': ["U' y L' U L"],
+  'f2l-4': ["U R U' R'"],
+  'f2l-5': ["R U R' U2 R U' R' U R U' R'", "y L' U L U2 y' R U R'"],
+  'f2l-6': ["y L' U2 L U L' U' L"],
+  'f2l-7': ["R U' R' U2 y L' U' L"],
+  'f2l-9': ["R U' R' U2 R U R'"],
+  'f2l-10': ["U2 R U R' y L' U' L"],
+  'f2l-11': ["U y L' U L U' L' U' L"],
+  'f2l-12': ["U' R U R' U R U R'"],
+  'f2l-13': ["U y L' U' L U L' U2 L"],
+  'f2l-14': ["U y L' U2 L U L' U2 L"],
+  'f2l-15': ["R U' R' U R U' R' U' R U2 R'", "U y L' U2 L U' y' R U R'"],
+  'f2l-16': ["U y L' U' L U' L' U' L"],
+  'f2l-17': ["U R U2 R' U R U' R'"],
+  'f2l-18': ["U' y L' U2 L U' L' U L"],
+  'f2l-21': ["U' R U2 R' U y L' U' L"],
+  'f2l-23': ["R U R' U R U2 R' y L' U2 L"],
+  'f2l-24': ["R U R' U R U2 R' U2 R U R'"],
+  'f2l-25': ["R U' R' y L' U2 L"],
+  'f2l-26': ["U' R U' R' U' R U2 R'"],
+  'f2l-28': ["U y L' U' L U' y' R U R'"],
+  'f2l-29': ["U' R U R' U y L' U' L"],
+  'f2l-30': ["R U R' U' R U R' U' R U R'"],
+  'f2l-31': ["R U2 R' y L' U2 L"],
+  'f2l-32': ["R U' R' U R U R' U2 R U R'", "y L' U2 L U2 y' R U R'"],
+  'f2l-33': ["U' R U R' U' R U R'"],
+  'f2l-34': ["U' R U' R' U R U' R'"],
+  'f2l-35': ["U2 R U' R' y L' U' L"],
+  'f2l-36': ["U R U R' U' y L' U' L"],
+  'f2l-37': ["y L' U L U2 L' U' L y' R U R'"],
+  'f2l-38': ["R U' R' U2 R U R' y L' U' L"],
+  'f2l-39': ["R U R' U' R U2 R' U' R U R'"],
+  'f2l-40': ["R U' R' U y L' U2 L U L' U2 L"],
+  'f2l-41': ["R U R' U2 R U' R' U R U R'"],
 }
 
 /** ケースで選べる手順（先頭が標準手順）。 */
@@ -55,15 +92,27 @@ export function algsFor(c: { id: string; alg: string }): string[] {
 
 const algKey = (id: string) => `cubalyst.drillAlg.${id}`
 
-/** 手順練習で前回選んだ手順（選べる手順に無ければ標準手順）。 */
+/** 手順に F（F・F'・F2）が入っているか。 */
+export const usesF = (alg: string) => alg.split(/\s+/).some((m) => m[0] === 'F')
+
+/**
+ * 初めて選ぶときの手順。F2L は、標準手順が F を使うなら、F を使わない別の手順にする。
+ * F2L の F はエッジの向きを直すためなので、R・U（と持ち替えて左手）で回せる手順を先に練習できるようにする。
+ */
+export function defaultAlg(c: { id: string; alg: string }): string {
+  if (!c.id.startsWith('f2l-') || !usesF(c.alg)) return c.alg
+  return algsFor(c).find((a) => !usesF(a)) ?? c.alg
+}
+
+/** 手順練習で前回選んだ手順（選べる手順に無ければ初めて選ぶときの手順）。 */
 export function preferredAlg(c: { id: string; alg: string }): string {
   try {
     const v = localStorage.getItem(algKey(c.id))
     if (v && algsFor(c).includes(v)) return v
   } catch {
-    // 読めなければ標準手順
+    // 読めなければ初めて選ぶときの手順
   }
-  return c.alg
+  return defaultAlg(c)
 }
 
 /** 手順練習で選んだ手順を覚えておく。 */
