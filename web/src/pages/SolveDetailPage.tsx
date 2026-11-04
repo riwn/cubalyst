@@ -21,7 +21,7 @@ import { ReplayPlayer } from '../replay/ReplayPlayer'
 import { isRegrip, notationTokens } from '../solve/holds'
 import { useHoldFrame, useSettings } from '../settings/hooks'
 import { computeSplits, COLOR_LABELS } from '../solve/cfop'
-import { effectiveTime, formatTime, type Penalty } from '../solve/stats'
+import { effectiveTime, formatTime, formatTps, type Penalty } from '../solve/stats'
 import { formatDate, isFullSolve, MODE_LABELS, multiTitle } from '../format'
 
 /** ソルブ詳細：段階タイム、スクランブル、解法、ペナルティ・メモ編集。 */
@@ -72,7 +72,6 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
   }
 
   const moves = solve.moves ?? []
-  const tps = solve.total_ms > 0 ? (moves.length / (solve.total_ms / 1000)).toFixed(2) : '—'
 
   return (
     <div className="detail-page">
@@ -87,7 +86,7 @@ function SolveDetail({ solve, onChange }: { solve: Solve; onChange: (s: Solve) =
         <div className="muted">
           #{solve.id} ・ {formatDate(solve.solved_at)} ・ {MODE_LABELS[solve.mode]}
           {solve.case_id && ` ${solve.case_id}`}
-          {solve.step && ` ${solve.step}`} ・ {moves.length}手 ・ {tps} TPS
+          {solve.step && ` ${solve.step}`} ・ {moves.length}手 ・ {formatTps(moves.length, solve.total_ms)} TPS
         </div>
         <div className="row">
           <button className={solve.penalty === '+2' ? 'on' : ''} onClick={() => setPenalty('+2')}>

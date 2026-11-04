@@ -705,6 +705,15 @@ code {
   color: var(--mute);
 }
 
+.timer-stats {
+  min-height: 1.6em;
+  margin-top: 0.3em;
+  font-family: var(--font-num);
+  font-size: 1.25em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .timer-hint {
   min-height: 1.6em;
   color: var(--mute);
