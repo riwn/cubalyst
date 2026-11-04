@@ -54,6 +54,13 @@ describe('AlgDrill', () => {
     expect(events[0].attempt.ms).toBe((moves.length - 1) * 100)
   })
 
+  it('accepts an algorithm with a y rotation in it', () => {
+    // y L' U' L は、キューブから見ると（持ち替えは記録されないので）F' U' F
+    const { events, turn } = setup("y L' U' L")
+    toCubeMoves("F' U' F").forEach((m) => turn(m))
+    expect(events).toHaveLength(1)
+  })
+
   it('accepts AUF before and after the algorithm', () => {
     const { events, turn } = setup(TPERM)
     toCubeMoves(`U ${TPERM} U2`).forEach((m) => turn(m))
