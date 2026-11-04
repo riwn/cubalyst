@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import type { CaseInfo } from '../api'
+import { f2lGrayStickers } from '../cases/f2l-view'
 import { pllArrows } from '../cases/pll-arrows'
 
 // 標準の向き（上面＝黄、前面＝緑）での表示色。
@@ -17,7 +18,7 @@ const S = 14 // シール1枚の大きさ
 const G = 2 // すき間
 
 /**
- * ケースの図。OLL/PLL は上面（＋側面の上段）、F2L は上面＋前面＋右面。
+ * ケースの図。OLL/PLL は上面（＋側面の上段）、F2L は右手前の上から見た立体（上面・前面・右面）。
  * OLLは最終層の色以外を灰色にし、向きだけが分かるようにする。
  * arrows を付けると、PLL ではどのパーツをどこへ動かすかを矢印で重ねる（小さい図では見づらいので、大きい図だけで使う）。
  */
@@ -43,18 +44,7 @@ export function CaseDiagram({
   const cells: React.ReactNode[] = []
   const step = S + G
 
-  if (c.set === 'F2L') {
-    // 上面（U 0-8）、前面（F 18-26）、右面（R 9-17）を展開図で
-    for (let i = 0; i < 9; i++) cells.push(cell((i % 3) * step, Math.floor(i / 3) * step, i))
-    for (let i = 0; i < 9; i++) cells.push(cell((i % 3) * step, 3 * step + G + Math.floor(i / 3) * step, 18 + i))
-    for (let i = 0; i < 9; i++) cells.push(cell(3 * step + G + (i % 3) * step, 3 * step + G + Math.floor(i / 3) * step, 9 + i))
-    const w = 6 * step + G
-    return (
-      <svg viewBox={`-2 -2 ${w + 4} ${w + 4}`} width={size} height={size} role="img" aria-label="ケースの図">
-        {cells}
-      </svg>
-    )
-  }
+  if (c.set === 'F2L') return <F2LCube facelets={f} size={size} />
 
   // 上面＋側面の上段（細長いシール）
   const o = 6 // 側面ぶんの余白
@@ -107,6 +97,66 @@ export function CaseDiagram({
           })}
         </g>
       )}
+    </svg>
+  )
+}
+
+/** 立体の図の1マスの長さ。 */
+const U3 = 10
+const COS30 = Math.cos(Math.PI / 6)
+type Vec = [number, number]
+// 右手前の上から見た等角図の向き：前面の左→右（X）、右面の手前→奥（Z）、下（Y）
+const X: Vec = [COS30 * U3, 0.5 * U3]
+const Z: Vec = [COS30 * U3, -0.5 * U3]
+const Y: Vec = [0, U3]
+// 手前・左・上の角を原点にする
+const at = (x: number, z: number, y: number): Vec => [X[0] * x + Z[0] * z + Y[0] * y, X[1] * x + Z[1] * z + Y[1] * y]
+
+/** 原点を角にして、a・b の向きに広がる1マスのシール（すき間のぶん内側に縮める）。 */
+function quad(o: Vec, a: Vec, b: Vec): string {
+  const k = 0.08
+  const p = (s: number, t: number) => `${(o[0] + a[0] * s + b[0] * t).toFixed(2)},${(o[1] + a[1] * s + b[1] * t).toFixed(2)}`
+  return [p(k, k), p(1 - k, k), p(1 - k, 1 - k), p(k, 1 - k)].join(' ')
+}
+
+/**
+ * F2L のケースの図。キューブを右手前の上から見た立体で、上面・前面・右面を描く。
+ * FR のペア（角とエッジ）だけ色を付け、上段のほかのパーツは灰色にする。
+ */
+function F2LCube({ facelets, size }: { facelets: string; size: number }) {
+  const gray = f2lGrayStickers(facelets)
+  const fill = (i: number) => (gray.has(i) ? GRAY : (COLORS[facelets[i]] ?? GRAY))
+  const stickers: React.ReactNode[] = []
+  const add = (i: number, o: Vec, a: Vec, b: Vec) =>
+    stickers.push(<polygon key={i} points={quad(o, a, b)} fill={fill(i)} />)
+  for (let r = 0; r < 3; r++) {
+    for (let col = 0; col < 3; col++) {
+      // 上面：U0 が奥の左。行は奥から手前、列は左から右
+      add(3 * r + col, at(col, 2 - r, 0), X, Z)
+      // 前面：F18 が上の左
+      add(18 + 3 * r + col, at(col, 0, r), X, Y)
+      // 右面：R9 が上の手前。列は手前から奥
+      add(9 + 3 * r + col, at(3, col, r), Z, Y)
+    }
+  }
+  // キューブの輪郭（六角形）を黒で敷いて、シールのすき間を黒く見せる
+  const outline = [at(0, 0, 0), at(0, 3, 0), at(3, 3, 0), at(3, 3, 3), at(3, 0, 3), at(0, 0, 3)]
+    .map((v) => v.join(','))
+    .join(' ')
+  const w = 6 * X[0]
+  const top = 3 * Z[1]
+  const h = 3 * Y[1] - top + 3 * X[1]
+  const pad = 1.5
+  return (
+    <svg
+      viewBox={`${-pad} ${top - pad} ${w + 2 * pad} ${h + 2 * pad}`}
+      width={size}
+      height={size}
+      role="img"
+      aria-label="ケースの図"
+    >
+      <polygon points={outline} fill="#14181c" stroke="#14181c" strokeWidth={1.2} strokeLinejoin="round" />
+      {stickers}
     </svg>
   )
 }
