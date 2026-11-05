@@ -82,8 +82,8 @@ paths:
           schema: { type: string, example: "splits,analyses" }
         - name: sort
           in: query
-          description: 並べ替えの基準。値の無いもの（DNF など）は最後
-          schema: { type: string, enum: [date, time, moves, cross, f2l, oll, pll], default: date }
+          description: 並べ替えの基準。tps は段階の手数の合計を実測の時間（+2 を含めない）で割った値。値の無いもの（DNF など）は最後
+          schema: { type: string, enum: [date, time, moves, tps, cross, f2l, oll, pll], default: date }
         - { name: order, in: query, description: asc で昇順（既定は降順）, schema: { type: string, enum: [asc, desc] } }
       responses:
         "200":

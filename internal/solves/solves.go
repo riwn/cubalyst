@@ -349,6 +349,8 @@ var SortKeys = map[string]string{
 	"date":  "solved_at",
 	"time":  "CASE penalty WHEN 'DNF' THEN NULL WHEN '+2' THEN total_ms + 2000 ELSE total_ms END",
 	"moves": "(SELECT SUM(move_count) FROM solve_splits WHERE solve_id = solves.id)",
+	// 1秒あたりの手数（段階の手数の合計 ÷ 実測の時間。+2 は含めない）
+	"tps": "(SELECT SUM(move_count) * 1000.0 / NULLIF(solves.total_ms, 0) FROM solve_splits WHERE solve_id = solves.id)",
 	"cross": splitSum("'cross'"),
 	"f2l":   splitSum("'f2l1', 'f2l2', 'f2l3', 'f2l4'"),
 	"oll":   splitSum("'oll'"),

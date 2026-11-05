@@ -5,7 +5,7 @@ import { AnalysisTabs } from '../components/AnalysisTabs'
 import { formatDate, KIND_LABELS, MODE_LABELS } from '../format'
 import { GROUP_LABELS, groupSplits, type StageGroup } from '../solve/cfop'
 import { useSolveList } from '../solve/hooks'
-import { effectiveTime, formatTime } from '../solve/stats'
+import { effectiveTime, formatTime, formatTps } from '../solve/stats'
 
 const PAGE_SIZE = 50
 const GROUPS: StageGroup[] = ['cross', 'f2l', 'oll', 'pll']
@@ -22,7 +22,7 @@ const DEFAULT_SORT: Sort = { key: 'date', asc: false }
 
 /** 履歴：ソルブ一覧（フィルタ・並べ替え・ページング・選択してexport）。 */
 export function HistoryPage() {
-  const [mode, setMode] = useState<SolveMode | ''>('')
+  const [mode, setMode] = useState<SolveMode | ''>('full')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [page, setPage] = useState(0)
@@ -59,9 +59,9 @@ export function HistoryPage() {
     set(v)
     setPage(0)
   }
-  // 同じ列ならもう一度押すと逆順。別の列は、日時なら新しい順、それ以外は速い（少ない）順から
+  // 同じ列ならもう一度押すと逆順。別の列は、日時なら新しい順、TPS なら大きい（速い）順、それ以外は速い（少ない）順から
   const sortBy = (key: SolveSort) =>
-    resetPage(setSort)(sort.key === key ? { key, asc: !sort.asc } : { key, asc: key !== 'date' })
+    resetPage(setSort)(sort.key === key ? { key, asc: !sort.asc } : { key, asc: key !== 'date' && key !== 'tps' })
   const sortHeader = (key: SolveSort, label: string) => (
     <th aria-sort={sort.key === key ? (sort.asc ? 'ascending' : 'descending') : undefined}>
       <button className={`sort-button ${sort.key === key ? 'sorted' : ''}`} onClick={() => sortBy(key)}>
@@ -119,8 +119,8 @@ export function HistoryPage() {
               <Fragment key={g}>{sortHeader(g, GROUP_LABELS[g])}</Fragment>
             ))}
             {sortHeader('moves', '手数')}
+            {sortHeader('tps', 'TPS')}
             <th>解析</th>
-            <th className="left">メモ</th>
           </tr>
         </thead>
         <tbody>
@@ -147,10 +147,10 @@ export function HistoryPage() {
                   <td key={g}>{groups[g] ? formatTime(groups[g].ms) : ''}</td>
                 ))}
                 <td>{moves || ''}</td>
+                <td>{moves ? formatTps(moves, s.total_ms) : ''}</td>
                 <td className="analysis-marks">
                   <AnalysisMarks solveId={s.id} counts={s.analyses} />
                 </td>
-                <td className="left note">{s.note}</td>
               </tr>
             )
           })}
