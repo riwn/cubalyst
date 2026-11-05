@@ -194,6 +194,7 @@ func TestListSort(t *testing.T) {
 		{Filter{Sort: "time"}, []int64{4, 2, 1, 3}},                   // 降順でも DNF は最後
 		{Filter{Sort: "moves", Ascending: true}, []int64{2, 1, 4, 3}}, // 段階の無いソルブは最後（新しい順）
 		{Filter{Sort: "oll", Ascending: true}, []int64{1, 2, 4, 3}},
+		{Filter{Sort: "tps"}, []int64{1, 2, 4, 3}}, // 38手/10秒 > 16手/9秒（+2 は含めない）、段階の無いソルブは最後
 		{Filter{Sort: "time", Ascending: true, Limit: 2, Offset: 1}, []int64{2, 4}},
 	} {
 		if got := ids(tc.f); !slices.Equal(got, tc.want) {

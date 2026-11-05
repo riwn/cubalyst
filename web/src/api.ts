@@ -55,7 +55,7 @@ export type Solve = {
 export type NewSolve = Omit<Solve, 'id'>
 
 /** 一覧の並べ替えの基準。time は +2 込み、DNF と値の無いソルブ（段階が無いなど）はいつも最後。 */
-export type SolveSort = 'date' | 'time' | 'moves' | 'cross' | 'f2l' | 'oll' | 'pll'
+export type SolveSort = 'date' | 'time' | 'moves' | 'tps' | 'cross' | 'f2l' | 'oll' | 'pll'
 
 export type SolveFilter = {
   mode?: SolveMode

@@ -1042,20 +1042,8 @@ a:hover {
   font-size: 1rem;
 }
 
-.history-table td.note {
-  font-family: var(--font-ui);
-  font-size: 0.9rem;
-}
-
 .history-table td.time {
   font-weight: 600;
-}
-
-.history-table td.note {
-  color: var(--mute);
-  max-width: 16em;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .history-page {
@@ -1464,6 +1452,40 @@ a.kind-badge:hover {
   align-items: center;
   gap: 8px;
   margin-left: auto;
+}
+
+/* 中継（/live）へのリンク。ヘッダーのキューブ名の左 */
+.live-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--error) 55%, transparent);
+  border-radius: 4px;
+  color: var(--error);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.live-link:hover {
+  background: color-mix(in srgb, var(--error) 10%, transparent);
+}
+
+.live-link.active {
+  background: var(--error);
+  border-color: var(--error);
+  color: #fff;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .conn-chip {

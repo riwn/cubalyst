@@ -14,7 +14,10 @@ import { TimerPage } from './pages/TimerPage'
 import { SettingsProvider } from './settings/SettingsProvider'
 import { setNavCollapsed, useNavCollapsed } from './ui/prefs'
 
-/** 左のメニュー。match に当てはまるパスでも選択中にする（解析は統計・履歴・解析の3つのタブをまとめる）。 */
+/**
+ * 左のメニュー。match に当てはまるパスでも選択中にする（解析は履歴・統計・AI解析の3つのタブをまとめ、履歴から開く）。
+ * 中継はヘッダーの LIVE から開く。
+ */
 const NAV: { to: string; label: string; icon: ReactNode; end?: boolean; match?: RegExp }[] = [
   {
     to: '/',
@@ -28,6 +31,12 @@ const NAV: { to: string; label: string; icon: ReactNode; end?: boolean; match?: 
     ),
   },
   {
+    to: '/history',
+    label: '解析',
+    match: /^\/(stats|history|analyses)(\/|$)/,
+    icon: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
+  },
+  {
     to: '/practice',
     label: '練習',
     icon: (
@@ -37,22 +46,6 @@ const NAV: { to: string; label: string; icon: ReactNode; end?: boolean; match?: 
         <circle cx="12" cy="12" r="1.2" />
       </>
     ),
-  },
-  {
-    to: '/live',
-    label: '中継',
-    icon: (
-      <>
-        <circle cx="12" cy="12" r="2" />
-        <path d="M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8" />
-      </>
-    ),
-  },
-  {
-    to: '/stats',
-    label: '解析',
-    match: /^\/(stats|history|analyses)(\/|$)/,
-    icon: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
   },
 ]
 
@@ -118,6 +111,15 @@ export default function App() {
               <Link to="/">Cubalyst</Link>
             </h1>
             <div className="header-right">
+              <NavLink
+                to="/live"
+                className={({ isActive }) => `live-link ${isActive ? 'active' : ''}`}
+                title="中継：キューブをつないだブラウザのタイマー画面を映す"
+                aria-label="中継"
+              >
+                <span className="live-dot" aria-hidden="true" />
+                LIVE
+              </NavLink>
               <CubeConnectionControl />
               <SystemMenu />
             </div>
