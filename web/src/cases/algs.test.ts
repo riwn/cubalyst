@@ -46,8 +46,7 @@ describe('diagram follows the chosen alg', () => {
     expect(headlights(caseForAlg(kpuzzle, { alg: c('pll-Aa').alg, pattern: '' }, alg).pattern, 9, 11)).toBe(true)
   })
 
-  it("draws Ab's headlights in front for R B' R F2 R' B R F2 R2", () => {
-    const alg = "R B' R F2 R' B R F2 R2"
+  it.each(["R B' R F2 R' B R F2 R2", "x' R U' R D2 R' U R D2 R2 x"])("draws Ab's headlights in front for %s", (alg) => {
     expect(algsFor(c('pll-Ab'))).toContain(alg)
     expect(headlights(caseForAlg(kpuzzle, { alg: c('pll-Ab').alg, pattern: '' }, alg).pattern, 18, 20)).toBe(true)
   })
