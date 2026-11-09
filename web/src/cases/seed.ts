@@ -11,6 +11,19 @@ export function casePattern(kpuzzle: KPuzzle, alg: string): string {
   return patternToFacelets(applyNormalized(kpuzzle, new Alg(alg).invert().toString()))
 }
 
+const patterns = new Map<string, string>()
+
+/** ケースの図を、その手順で揃う向きにしたもの（別手順はヘッドライトなどの向きが標準手順と違うことがある）。 */
+export function caseForAlg<T extends { alg: string; pattern: string }>(kpuzzle: KPuzzle, c: T, alg: string): T {
+  if (!alg || alg === c.alg) return c
+  let pattern = patterns.get(alg)
+  if (pattern === undefined) {
+    pattern = casePattern(kpuzzle, alg)
+    patterns.set(alg, pattern)
+  }
+  return { ...c, pattern }
+}
+
 const q = (s: string) => `'${s.replace(/'/g, "''")}'`
 
 export function casesMigrationSQL(kpuzzle: KPuzzle): string {

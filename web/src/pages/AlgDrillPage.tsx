@@ -6,6 +6,7 @@ import { useAlgDrill, useCaseSetup, useCaseSetupState, useDrillState } from '../
 import type { CaseSetup, CaseSetupState } from '../cases/setup'
 import { scrambleBetween } from '../cases/exercise'
 import { invertRotation, normalizeOrientation } from '../cases/geometry'
+import { caseForAlg } from '../cases/seed'
 import { caseStats } from '../cases/stats'
 import { CaseDiagram } from '../components/CaseDiagram'
 import { FitLayout } from '../components/FitLayout'
@@ -56,6 +57,7 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
   const [selectedId, setSelectedId] = useState<string | null>(() => (setOf(initialCaseId) ? initialCaseId! : null))
   const [running, setRunning] = useState(false)
   const [chosenAlg, setChosenAlg] = useState<Record<string, string>>({})
+  const store = useCubeStore()
   const history = useSolveList({ mode: 'case', limit: 0 })
   const stats = useMemo(() => caseStats(history.solves), [history.solves])
 
@@ -74,7 +76,8 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
       setError(`「覚えた」を保存できませんでした: ${String(err)}`)
     })
   }
-  const alg = selected ? (chosenAlg[selected.id] ?? preferredAlg(selected)) : ''
+  const algOf = (c: CaseInfo) => chosenAlg[c.id] ?? preferredAlg(c)
+  const alg = selected ? algOf(selected) : ''
   const chooseAlg = (id: string, a: string) => {
     setChosenAlg((prev) => ({ ...prev, [id]: a }))
     savePreferredAlg(id, a)
@@ -106,7 +109,7 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
       {selected && (
         <section className="panel drill-selected" aria-live="polite">
           <div className="row">
-            <CaseDiagram c={selected} size={96} arrows />
+            <CaseDiagram c={caseForAlg(store.kpuzzle, selected, alg)} size={96} arrows />
             <div className="drill-selected-info">
               <div className="row">
                 <strong>{selected.name}</strong>
@@ -165,7 +168,7 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
                     onClick={() => setSelectedId(c.id)}
                     title={c.alg}
                   >
-                    <CaseDiagram c={c} />
+                    <CaseDiagram c={caseForAlg(store.kpuzzle, c, algOf(c))} />
                     <div className="case-name">
                       {c.learned && <span className="learned-mark" aria-label="覚えた">✓</span>}
                       {c.name}
@@ -296,7 +299,7 @@ function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBa
           </div>
 
           <section className="panel drill-head">
-            <CaseDiagram c={c} size={88} arrows />
+            <CaseDiagram c={caseForAlg(store.kpuzzle, c, alg)} size={88} arrows />
             <div>
               <strong>{c.name}</strong>
               <div className="alg drill-alg">{alg}</div>

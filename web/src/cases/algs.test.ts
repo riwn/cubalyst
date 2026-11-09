@@ -6,6 +6,7 @@ import { stageLevel } from '../solve/cfop'
 import { algsFor, ALT_ALGS, defaultAlg, usesF } from './algs'
 import { ALL_CASES } from './data'
 import { applyNormalized, caseSignature, ROTATIONS } from './geometry'
+import { caseForAlg } from './seed'
 
 const kpuzzle = await cube3x3x3.kpuzzle()
 
@@ -31,6 +32,29 @@ describe('alternative algs', () => {
     expect(caseSignature(c.set, caseState(alg))).toBe(caseSignature(c.set, caseState(c.alg)))
     expect(level(alg)).toBe(level(c.alg))
     expect(alg).not.toBe(c.alg)
+  })
+})
+
+describe('diagram follows the chosen alg', () => {
+  const c = (id: string) => ALL_CASES.find((x) => x.id === id)!
+  // 面の上段の両端のシール（R：9・11、F：18・20）が同じ色ならヘッドライト
+  const headlights = (f: string, a: number, b: number) => f[a] === f[b]
+
+  it("draws Aa's headlights on the right for x' R2 D2 R' U' R D2 R' U R' x", () => {
+    const alg = "x' R2 D2 R' U' R D2 R' U R' x"
+    expect(algsFor(c('pll-Aa'))).toContain(alg)
+    expect(headlights(caseForAlg(kpuzzle, { alg: c('pll-Aa').alg, pattern: '' }, alg).pattern, 9, 11)).toBe(true)
+  })
+
+  it("draws Ab's headlights in front for R B' R F2 R' B R F2 R2", () => {
+    const alg = "R B' R F2 R' B R F2 R2"
+    expect(algsFor(c('pll-Ab'))).toContain(alg)
+    expect(headlights(caseForAlg(kpuzzle, { alg: c('pll-Ab').alg, pattern: '' }, alg).pattern, 18, 20)).toBe(true)
+  })
+
+  it('keeps the stored pattern for the standard alg', () => {
+    const x = { alg: "R U R'", pattern: 'stored' }
+    expect(caseForAlg(kpuzzle, x, x.alg)).toBe(x)
   })
 })
 

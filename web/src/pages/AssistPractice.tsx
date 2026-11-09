@@ -5,6 +5,7 @@ import { listCases, type CaseInfo, type NewSolve, type Solve } from '../api'
 import { stickyAssist, viewFrom, type Assist, type StickyAssist } from '../assist/detect'
 import { preferredAlg } from '../cases/algs'
 import type { CaseDef } from '../cases/data'
+import { caseForAlg } from '../cases/seed'
 import { CaseDiagram } from '../components/CaseDiagram'
 import { PracticeRunner } from '../components/PracticeRunner'
 import { useCubeStore } from '../cube/hooks'
@@ -253,6 +254,7 @@ function CaseHint({
   show: boolean
   missing?: string
 }) {
+  const store = useCubeStore()
   return (
     <div className="assist-case row">
       {place && <span className="assist-slot">{place}</span>}
@@ -262,7 +264,7 @@ function CaseHint({
         <span className="muted">考え中…</span>
       ) : (
         <>
-          {info && <CaseDiagram c={info} size={56} arrows />}
+          {info && <CaseDiagram c={caseForAlg(store.kpuzzle, info, preferredAlg(info))} size={56} arrows />}
           <div>
             <div>
               <strong>{c.name}</strong>
