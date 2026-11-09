@@ -30,7 +30,7 @@ export const ALT_ALGS: Record<string, string[]> = {
   'oll-52': ["R' F' U' F U' R U R' U R"],
   'oll-57': ["R U R' U' r R' U R U' r'"],
   'pll-Aa': ["x L2 D2 L' U' L D2 L' U L' x'", "R' F R' B2 R F' R' B2 R2", "x' R2 D2 R' U' R D2 R' U R' x"],
-  'pll-Ab': ["x' L2 D2 L U L' D2 L U' L x", "R B' R F2 R' B R F2 R2"],
+  'pll-Ab': ["x' L2 D2 L U L' D2 L U' L x", "R B' R F2 R' B R F2 R2", "x' R U' R D2 R' U R D2 R2 x"],
   'pll-H': ["M2 U' M2 U2 M2 U' M2", 'R2 U2 R U2 R2 U2 R2 U2 R U2 R2'],
   'pll-Ua': ["R U' R U R U R U' R' U' R2", "R2 U' R' U' R U R U R U' R"],
   'pll-Ub': ["R2 U R U R' U' R' U' R' U R'", "R' U R' U' R' U' R' U R U R2"],
