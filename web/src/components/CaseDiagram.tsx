@@ -2,6 +2,7 @@ import { useId } from 'react'
 import type { CaseInfo } from '../api'
 import { f2lGrayStickers } from '../cases/f2l-view'
 import { pllArrows } from '../cases/pll-arrows'
+import { slotView, type F2LSlot } from '../cases/slots'
 
 // 標準の向き（上面＝黄、前面＝緑）での表示色。
 const COLORS: Record<string, string> = {
@@ -21,15 +22,18 @@ const G = 2 // すき間
  * ケースの図。OLL/PLL は上面（＋側面の上段）、F2L は右手前の上から見た立体（上面・前面・右面）。
  * OLLは最終層の色以外を灰色にし、向きだけが分かるようにする。
  * arrows を付けると、PLL ではどのパーツをどこへ動かすかを矢印で重ねる（小さい図では見づらいので、大きい図だけで使う）。
+ * slot を付けると、F2L をそのスロットの角から見た図にする（pattern はそのスロットの手順で作ったもの）。
  */
 export function CaseDiagram({
   c,
   size = 72,
   arrows = false,
+  slot = 'FR',
 }: {
   c: Pick<CaseInfo, 'set' | 'pattern'>
   size?: number
   arrows?: boolean
+  slot?: F2LSlot
 }) {
   const markerId = useId()
   const f = c.pattern
@@ -44,7 +48,10 @@ export function CaseDiagram({
   const cells: React.ReactNode[] = []
   const step = S + G
 
-  if (c.set === 'F2L') return <F2LCube facelets={f} size={size} />
+  if (c.set === 'F2L') {
+    const view = slotView(f, slot)
+    return <IsoCube facelets={view} gray={f2lGrayStickers(view, slot)} size={size} />
+  }
 
   // 上面＋側面の上段（細長いシール）
   const o = 6 // 側面ぶんの余白
@@ -120,12 +127,11 @@ function quad(o: Vec, a: Vec, b: Vec): string {
 }
 
 /**
- * F2L のケースの図。キューブを右手前の上から見た立体で、上面・前面・右面を描く。
- * FR のペア（角とエッジ）だけ色を付け、上段のほかのパーツは灰色にする。
+ * キューブを右手前の上から見た立体の図（上面・前面・右面）。gray のシールは灰色にする。
+ * F2L のケースの図では、スロットのペア（角とエッジ）だけ色を付け、上段のほかのパーツを灰色にする。
  */
-function F2LCube({ facelets, size }: { facelets: string; size: number }) {
-  const gray = f2lGrayStickers(facelets)
-  const fill = (i: number) => (gray.has(i) ? GRAY : (COLORS[facelets[i]] ?? GRAY))
+export function IsoCube({ facelets, gray, size = 72 }: { facelets: string; gray?: Set<number>; size?: number }) {
+  const fill = (i: number) => (gray?.has(i) ? GRAY : (COLORS[facelets[i]] ?? GRAY))
   const stickers: React.ReactNode[] = []
   const add = (i: number, o: Vec, a: Vec, b: Vec) =>
     stickers.push(<polygon key={i} points={quad(o, a, b)} fill={fill(i)} />)

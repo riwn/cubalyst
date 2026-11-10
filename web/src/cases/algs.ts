@@ -1,5 +1,6 @@
 // ケースごとの別手順（標準手順のほかに選べる手順）。標準手順と同じ向き・同じ前提で書く。
 // 同じケースを解けるかは algs.test.ts で検証する。
+import { slotAlg, type F2LSlot } from './slots'
 
 export const ALT_ALGS: Record<string, string[]> = {
   'oll-1': ["R U B' l U l2 x' U' R' F R F'"],
@@ -85,12 +86,13 @@ export const ALT_ALGS: Record<string, string[]> = {
   'f2l-41': ["R U R' U2 R U' R' U R U R'"],
 }
 
-/** ケースで選べる手順（先頭が標準手順）。 */
-export function algsFor(c: { id: string; alg: string }): string[] {
-  return [c.alg, ...(ALT_ALGS[c.id] ?? [])]
+/** ケースで選べる手順（先頭が標準手順）。F2L は、スロットを渡すとそのスロットの手順にする。 */
+export function algsFor(c: { id: string; alg: string }, slot: F2LSlot = 'FR'): string[] {
+  return [c.alg, ...(ALT_ALGS[c.id] ?? [])].map((a) => slotAlg(a, slot))
 }
 
-const algKey = (id: string) => `cubalyst.drillAlg.${id}`
+// 右手前の手順は、スロットを分ける前からのキーのまま
+const algKey = (id: string, slot: F2LSlot) => (slot === 'FR' ? `cubalyst.drillAlg.${id}` : `cubalyst.drillAlg.${id}.${slot}`)
 
 /** 手順に F（F・F'・F2）が入っているか。 */
 export const usesF = (alg: string) => alg.split(/\s+/).some((m) => m[0] === 'F')
@@ -98,27 +100,28 @@ export const usesF = (alg: string) => alg.split(/\s+/).some((m) => m[0] === 'F')
 /**
  * 初めて選ぶときの手順。F2L は、標準手順が F を使うなら、F を使わない別の手順にする。
  * F2L の F はエッジの向きを直すためなので、R・U（と持ち替えて左手）で回せる手順を先に練習できるようにする。
+ * ほかのスロットでは、右手前で選ぶ手順を鏡写しにしたものにする。
  */
-export function defaultAlg(c: { id: string; alg: string }): string {
-  if (!c.id.startsWith('f2l-') || !usesF(c.alg)) return c.alg
-  return algsFor(c).find((a) => !usesF(a)) ?? c.alg
+export function defaultAlg(c: { id: string; alg: string }, slot: F2LSlot = 'FR'): string {
+  if (!c.id.startsWith('f2l-') || !usesF(c.alg)) return slotAlg(c.alg, slot)
+  return slotAlg(algsFor(c).find((a) => !usesF(a)) ?? c.alg, slot)
 }
 
 /** 手順練習で前回選んだ手順（選べる手順に無ければ初めて選ぶときの手順）。 */
-export function preferredAlg(c: { id: string; alg: string }): string {
+export function preferredAlg(c: { id: string; alg: string }, slot: F2LSlot = 'FR'): string {
   try {
-    const v = localStorage.getItem(algKey(c.id))
-    if (v && algsFor(c).includes(v)) return v
+    const v = localStorage.getItem(algKey(c.id, slot))
+    if (v && algsFor(c, slot).includes(v)) return v
   } catch {
     // 読めなければ初めて選ぶときの手順
   }
-  return defaultAlg(c)
+  return defaultAlg(c, slot)
 }
 
 /** 手順練習で選んだ手順を覚えておく。 */
-export function savePreferredAlg(id: string, alg: string) {
+export function savePreferredAlg(id: string, alg: string, slot: F2LSlot = 'FR') {
   try {
-    localStorage.setItem(algKey(id), alg)
+    localStorage.setItem(algKey(id, slot), alg)
   } catch {
     // 保存できなくても練習はできる
   }

@@ -5,19 +5,12 @@ import { patternToFacelets } from '../cube/facelets'
 import { stageLevel } from '../solve/cfop'
 import { algsFor, ALT_ALGS, defaultAlg, usesF } from './algs'
 import { ALL_CASES } from './data'
-import { applyNormalized, caseSignature, ROTATIONS } from './geometry'
+import { applyNormalized, caseSignature, closeRotation } from './geometry'
 import { caseForAlg } from './seed'
 
 const kpuzzle = await cube3x3x3.kpuzzle()
 
-/** 手順の最後に、全体の向きを元に戻す持ち替えを足す（y を含む手順は、回し終えると向きが変わっているため）。 */
-function closeRotation(alg: string): string {
-  const solved = kpuzzle.defaultPattern()
-  const r = ROTATIONS.find((r) => solved.applyAlg(`${alg} ${r}`).patternData.CENTERS.pieces.every((v, i) => v === i))
-  return r ? `${alg} ${r}` : alg
-}
-
-const caseState = (alg: string) => applyNormalized(kpuzzle, new Alg(closeRotation(alg)).invert().toString())
+const caseState = (alg: string) => applyNormalized(kpuzzle, new Alg(closeRotation(kpuzzle, alg)).invert().toString())
 const level = (alg: string) => stageLevel(patternToFacelets(caseState(alg)), 'yellow')
 
 const rows = Object.entries(ALT_ALGS).flatMap(([id, algs]) => algs.map((alg) => [id, alg] as const))

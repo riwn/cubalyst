@@ -1947,3 +1947,110 @@ button.danger-solid {
   color: var(--warn);
   font-weight: 700;
 }
+
+/* 統計のケース別：次に覚えるケース */
+.next-cases {
+  margin: 4px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.next-cases h4 {
+  margin: 0 0 4px;
+}
+
+.next-cases-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.next-cases-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* PLL の認識練習 */
+.recog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recog-question {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 32px;
+}
+
+.recog-cube {
+  width: 200px;
+  height: 200px;
+}
+
+.recog-result {
+  flex: 1;
+  min-width: 220px;
+  min-height: 130px;
+}
+
+.recog-ok,
+.recog-ng {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.recog-ok {
+  color: var(--ok);
+}
+
+.recog-ng {
+  color: var(--error);
+}
+
+.recog-answers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recog-answer-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.recog-answer-group > .muted {
+  width: 5.5em;
+}
+
+.recog-answer {
+  min-width: 3.2em;
+  min-height: 2.6em;
+  font-family: var(--font-num);
+  font-size: 1.05rem;
+}
+
+.recog-answer.correct {
+  border-color: var(--ok);
+  box-shadow: inset 0 0 0 2px var(--ok);
+  opacity: 1;
+}
+
+.recog-answer.wrong {
+  border-color: var(--error);
+  box-shadow: inset 0 0 0 2px var(--error);
+  opacity: 1;
+}
+
+.recog-stats {
+  width: auto;
+  margin-top: 8px;
+}
