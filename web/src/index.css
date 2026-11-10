@@ -1459,26 +1459,28 @@ a.kind-badge:hover {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 8px;
-  border: 1px solid color-mix(in srgb, var(--error) 55%, transparent);
-  border-radius: 4px;
-  color: var(--error);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: 8px;
+  color: var(--mute);
+  font-size: 0.85rem;
   line-height: 1.4;
   text-decoration: none;
   white-space: nowrap;
 }
 
 .live-link:hover {
-  background: color-mix(in srgb, var(--error) 10%, transparent);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
 }
 
 .live-link.active {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--ink) 30%, transparent);
+}
+
+.live-link.active .live-dot {
   background: var(--error);
-  border-color: var(--error);
-  color: #fff;
 }
 
 .live-dot {
@@ -1521,7 +1523,7 @@ a.kind-badge:hover {
 }
 
 .system-icon {
-  font-size: 1rem;
+  display: block;
   color: var(--mute);
 }
 

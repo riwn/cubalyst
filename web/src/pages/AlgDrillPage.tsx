@@ -316,7 +316,7 @@ function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBa
             )}
           </section>
 
-          {status === 'disconnected' && <p className="muted center small">右上の「Connect」でキューブを接続すると練習できます</p>}
+          {status === 'disconnected' && <p className="muted center small">右上の「接続」でキューブを接続すると練習できます</p>}
 
           {settingUp && setup && setupState ? (
             <SetupPanel setup={setup} state={setupState} />
@@ -330,7 +330,7 @@ function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBa
                   ? `${state.moveCount}手`
                   : last != null
                     ? last <= targetMs
-                      ? `目標（${target}秒）以内！`
+                      ? `目標（${target}秒）以内`
                       : `目標まで ${((last - targetMs) / 1000).toFixed(2)}秒`
                     : '手順を回すと計測します'}
               </div>
