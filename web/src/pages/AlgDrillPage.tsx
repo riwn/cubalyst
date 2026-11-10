@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createSolve, listCases, setCaseLearned, type CaseInfo } from '../api'
+import { formatAlgInfo } from '../cases/alg-info'
 import { algsFor, preferredAlg, savePreferredAlg } from '../cases/algs'
 import type { DrillAttempt } from '../cases/drill'
 import { useAlgDrill, useCaseSetup, useCaseSetupState, useDrillState } from '../cases/hooks'
@@ -7,6 +8,7 @@ import type { CaseSetup, CaseSetupState } from '../cases/setup'
 import { scrambleBetween } from '../cases/exercise'
 import { invertRotation, normalizeOrientation } from '../cases/geometry'
 import { caseForAlg } from '../cases/seed'
+import { F2L_SLOTS, slotLabel, type F2LSlot } from '../cases/slots'
 import { caseStats } from '../cases/stats'
 import { CaseDiagram } from '../components/CaseDiagram'
 import { FitLayout } from '../components/FitLayout'
@@ -43,6 +45,25 @@ function saveTarget(id: string, sec: number) {
   }
 }
 
+const SLOT_KEY = 'cubalyst.drillSlot'
+
+function loadSlot(): F2LSlot {
+  try {
+    const v = localStorage.getItem(SLOT_KEY)
+    return F2L_SLOTS.find((s) => s.slot === v)?.slot ?? 'FR'
+  } catch {
+    return 'FR'
+  }
+}
+
+function saveSlot(slot: F2LSlot) {
+  try {
+    localStorage.setItem(SLOT_KEY, slot)
+  } catch {
+    // 保存できなくても練習はできる
+  }
+}
+
 /** ケース ID（oll-…・pll-…・f2l-…）の手順の種類。 */
 function setOf(id: string | null | undefined): SetName | undefined {
   const set = id?.split('-')[0].toUpperCase()
@@ -57,6 +78,8 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
   const [selectedId, setSelectedId] = useState<string | null>(() => (setOf(initialCaseId) ? initialCaseId! : null))
   const [running, setRunning] = useState(false)
   const [chosenAlg, setChosenAlg] = useState<Record<string, string>>({})
+  // F2L を練習するスロット。?case= で来たときは、統計のケース（右手前の形）をそのまま出す
+  const [f2lSlot, setF2lSlot] = useState<F2LSlot>(() => (initialCaseId ? 'FR' : loadSlot()))
   const store = useCubeStore()
   const history = useSolveList({ mode: 'case', limit: 0 })
   const stats = useMemo(() => caseStats(history.solves), [history.solves])
@@ -76,16 +99,21 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
       setError(`「覚えた」を保存できませんでした: ${String(err)}`)
     })
   }
-  const algOf = (c: CaseInfo) => chosenAlg[c.id] ?? preferredAlg(c)
+  const slotOf = (c: CaseInfo): F2LSlot => (c.set === 'F2L' ? f2lSlot : 'FR')
+  const algOf = (c: CaseInfo) => chosenAlg[`${c.id}.${slotOf(c)}`] ?? preferredAlg(c, slotOf(c))
   const alg = selected ? algOf(selected) : ''
-  const chooseAlg = (id: string, a: string) => {
-    setChosenAlg((prev) => ({ ...prev, [id]: a }))
-    savePreferredAlg(id, a)
+  const chooseAlg = (c: CaseInfo, a: string) => {
+    setChosenAlg((prev) => ({ ...prev, [`${c.id}.${slotOf(c)}`]: a }))
+    savePreferredAlg(c.id, a, slotOf(c))
+  }
+  const chooseSlot = (slot: F2LSlot) => {
+    setF2lSlot(slot)
+    saveSlot(slot)
   }
   if (error) return <p className="error">{error}</p>
 
   if (running && selected) {
-    return <DrillView c={selected} alg={alg} onBack={() => setRunning(false)} onSaved={history.reload} />
+    return <DrillView c={selected} alg={alg} slot={slotOf(selected)} onBack={() => setRunning(false)} onSaved={history.reload} />
   }
 
   const inTab = cases.filter((c) => c.set === tab)
@@ -105,35 +133,57 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
         <span className="muted small">練習したいケースを1つ選んでください。覚えたケースに印を付けると、ステップ練習で覚えた手順だけを出せます</span>
       </section>
 
+      {tab === 'F2L' && (
+        <section className="panel row">
+          <span className="small">スロット</span>
+          {F2L_SLOTS.map((s) => (
+            <button key={s.slot} className={f2lSlot === s.slot ? 'on-accent' : ''} onClick={() => chooseSlot(s.slot)}>
+              {s.label}
+            </button>
+          ))}
+          <span className="muted small">
+            図は、そのスロットの角から見た向きです。左手前と右奥は、右手前のケースを鏡に映した形と手順になります
+          </span>
+        </section>
+      )}
+
       {!selected && <section className="panel drill-selected drill-selected--empty">ケースを選ぶと、ここに手順と「この手順を練習」が出ます</section>}
       {selected && (
         <section className="panel drill-selected" aria-live="polite">
           <div className="row">
-            <CaseDiagram c={caseForAlg(store.kpuzzle, selected, alg)} size={96} arrows />
+            <CaseDiagram c={caseForAlg(store.kpuzzle, selected, alg)} size={96} arrows slot={slotOf(selected)} />
             <div className="drill-selected-info">
               <div className="row">
-                <strong>{selected.name}</strong>
+                <strong>
+                  {selected.name}
+                  {selected.set === 'F2L' && `（${slotLabel(f2lSlot)}）`}
+                </strong>
                 <label className="small learned-toggle">
                   <input type="checkbox" checked={selected.learned} onChange={() => toggleLearned(selected)} /> 覚えた
                 </label>
               </div>
-              {algsFor(selected).length > 1 ? (
+              {algsFor(selected, slotOf(selected)).length > 1 ? (
                 <div className="drill-alg-choices" role="radiogroup" aria-label="回す手順">
-                  {algsFor(selected).map((a, i) => (
+                  {algsFor(selected, slotOf(selected)).map((a, i) => (
                     <label key={a} className={`drill-alg-choice ${a === alg ? 'selected' : ''}`}>
                       <input
                         type="radio"
                         name="drill-alg"
                         checked={a === alg}
-                        onChange={() => chooseAlg(selected.id, a)}
+                        onChange={() => chooseAlg(selected, a)}
                       />
                       <span className="alg">{a}</span>
-                      {i === 0 && <span className="muted small">標準</span>}
+                      <span className="muted small">
+                        {formatAlgInfo(a)}
+                        {i === 0 && ' ・ 標準'}
+                      </span>
                     </label>
                   ))}
                 </div>
               ) : (
-                <div className="alg drill-alg">{selected.alg}</div>
+                <div className="alg drill-alg">
+                  {alg} <span className="muted small">{formatAlgInfo(alg)}</span>
+                </div>
               )}
               <div className="muted small">
                 全期間：{stats.get(selected.id)?.count ?? 0}回 ・ 平均 {formatTime(stats.get(selected.id)?.mean)} ・ ベスト{' '}
@@ -166,9 +216,9 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
                     key={c.id}
                     className={`case-card ${selectedId === c.id ? 'selected' : 'selectable'} ${c.learned ? 'learned' : ''}`}
                     onClick={() => setSelectedId(c.id)}
-                    title={c.alg}
+                    title={algOf(c)}
                   >
-                    <CaseDiagram c={caseForAlg(store.kpuzzle, c, algOf(c))} />
+                    <CaseDiagram c={caseForAlg(store.kpuzzle, c, algOf(c))} slot={slotOf(c)} />
                     <div className="case-name">
                       {c.learned && <span className="learned-mark" aria-label="覚えた">✓</span>}
                       {c.name}
@@ -185,7 +235,19 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
 }
 
 /** 練習中の画面。 */
-function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBack: () => void; onSaved: () => void }) {
+function DrillView({
+  c,
+  alg,
+  slot,
+  onBack,
+  onSaved,
+}: {
+  c: CaseInfo
+  alg: string
+  slot: F2LSlot
+  onBack: () => void
+  onSaved: () => void
+}) {
   const store = useCubeStore()
   const { settings } = useSettings()
   const { status, connection } = useCubeState()
@@ -299,9 +361,12 @@ function DrillView({ c, alg, onBack, onSaved }: { c: CaseInfo; alg: string; onBa
           </div>
 
           <section className="panel drill-head">
-            <CaseDiagram c={caseForAlg(store.kpuzzle, c, alg)} size={88} arrows />
+            <CaseDiagram c={caseForAlg(store.kpuzzle, c, alg)} size={88} arrows slot={slot} />
             <div>
-              <strong>{c.name}</strong>
+              <strong>
+                {c.name}
+                {c.set === 'F2L' && `（${slotLabel(slot)}）`}
+              </strong>
               <div className="alg drill-alg">{alg}</div>
               <div className="muted small hide-narrow">
                 揃っていなくても大丈夫です。手順を回し終えるたびに自動で記録します（前後のAUF・別の面での実行もOK）。

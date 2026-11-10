@@ -6,7 +6,7 @@ import type { KPattern, KPuzzle } from 'cubing/kpuzzle'
 import type { CubeStore } from '../cube/store'
 import { ScrambleTracker, type ScrambleProgress } from '../solve/scramble-tracker'
 import { scrambleBetween } from './exercise'
-import { applyNormalized } from './geometry'
+import { applyNormalized, closeRotation } from './geometry'
 
 export type CaseSetupState =
   | { phase: 'generating' }
@@ -17,9 +17,10 @@ export type CaseSetupState =
 /**
  * ケースの状態（キューブ座標系）。持ち方で手順を回すと揃う形＝完成状態に持ち方で手順の逆を当てた形。
  * rotation は「キューブ自身の向き → 持ち方の向き」への持ち替え（holdRotation）。最後の持ち替えは正規化で消える。
+ * y で持ち替える手順は、回し終えたときの向きを元に戻してから逆にする（戻さないと、別のスロットの形になる）。
  */
 export function caseSetupTarget(kpuzzle: KPuzzle, alg: string, rotation: string): KPattern {
-  return applyNormalized(kpuzzle, `${rotation} ${new Alg(alg).invert().toString()}`)
+  return applyNormalized(kpuzzle, `${rotation} ${new Alg(closeRotation(kpuzzle, alg)).invert().toString()}`)
 }
 
 export class CaseSetup {

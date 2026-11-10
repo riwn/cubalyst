@@ -4,11 +4,11 @@ import { Alg } from 'cubing/alg'
 import type { KPuzzle } from 'cubing/kpuzzle'
 import { patternToFacelets } from '../cube/facelets'
 import { ALL_CASES } from './data'
-import { applyNormalized } from './geometry'
+import { applyNormalized, closeRotation } from './geometry'
 
 /** ケースの状態（標準の向き）の facelets。画像生成用。 */
 export function casePattern(kpuzzle: KPuzzle, alg: string): string {
-  return patternToFacelets(applyNormalized(kpuzzle, new Alg(alg).invert().toString()))
+  return patternToFacelets(applyNormalized(kpuzzle, new Alg(closeRotation(kpuzzle, alg)).invert().toString()))
 }
 
 const patterns = new Map<string, string>()

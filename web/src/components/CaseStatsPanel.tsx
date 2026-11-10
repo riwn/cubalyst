@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { getStageCaseSummary, listCases, type CaseInfo, type SolveMode, type StageCaseSummary } from '../api'
+import { nextToLearn } from '../cases/next'
 import { formatTime } from '../solve/stats'
 import { CaseDiagram } from './CaseDiagram'
 
@@ -115,6 +116,15 @@ export function CaseStatsPanel({ mode, from, to }: { mode: SolveMode; from?: str
   const counted = all.reduce((n, r) => n + r.count, 0)
   const mean = counted > 0 ? all.reduce((s, r) => s + r.avg * r.count, 0) / counted : 0
   const unmatched = data && set === 'F2L' ? data.summary.pairs - counted : 0
+  const next = useMemo(() => {
+    if (!data || set === 'F2L') return null
+    const list = data.summary[set === 'OLL' ? 'oll' : 'pll']
+    const learned = new Set([...cases.values()].filter((c) => c.learned).map((c) => c.id))
+    return nextToLearn(
+      list.map((c) => ({ id: c.id, count: c.count, avg: c.avg_ms, steps: c.avg_steps })),
+      learned,
+    )
+  }, [data, set, cases])
 
   return (
     <section className="panel case-stats">
@@ -145,6 +155,34 @@ export function CaseStatsPanel({ mode, from, to }: { mode: SolveMode; from?: str
       {error && <p className="error">{error}</p>}
       {!data && !error && <p className="muted">集計しています…</p>}
       {data && rows.length === 0 && <p className="muted">この条件では {set} のケースを判定できたソルブがありません</p>}
+      {next && next.cases.length > 0 && (
+        <div className="next-cases">
+          <h4>次に覚えるケース</h4>
+          <p className="muted small">
+            2-look で揃えていることが多いケースです。1つの手順で揃えているケースの平均（{formatTime(next.oneLookAvg, 2)}
+            ）まで縮むとしたときの、縮む時間の合計が大きい順に並べています。覚えた印を付けたケースは除いています。
+          </p>
+          <ol className="next-cases-list">
+            {next.cases.map((n) => {
+              const c = cases.get(n.id)
+              return (
+                <li key={n.id}>
+                  {c && <CaseDiagram c={c} size={48} />}
+                  <div>
+                    <strong>{c?.name ?? n.id}</strong>
+                    <div className="small">
+                      {n.count}回 ・ 平均 {formatTime(n.avg, 2)}
+                    </div>
+                    <div className="small">
+                      −{(n.loss / 1000).toFixed(1)}秒 {c && <Link to={`/practice?case=${encodeURIComponent(c.id)}`}>練習</Link>}
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+        </div>
+      )}
       {data && rows.length > 0 && (
         <>
           <div className="case-stats-scroll">

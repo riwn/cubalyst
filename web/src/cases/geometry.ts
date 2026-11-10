@@ -27,6 +27,16 @@ export function normalizeOrientation(kpuzzle: KPuzzle, pattern: KPattern): KPatt
   throw new Error('normalizeOrientation: no rotation found')
 }
 
+/**
+ * 手順の最後に、全体の向きを元に戻す持ち替えを足す。
+ * y などを含む手順は回し終えると向きが変わっているので、逆手順でケースの形を作る前にそろえる。
+ */
+export function closeRotation(kpuzzle: KPuzzle, alg: string): string {
+  const solved = kpuzzle.defaultPattern()
+  const r = ROTATIONS.find((r) => solved.applyAlg(`${alg} ${r}`).patternData.CENTERS.pieces.every((v, i) => v === i))
+  return r ? `${alg} ${r}` : alg
+}
+
 /** 手順を当てた状態（向きは正規化済み）。 */
 export function applyNormalized(kpuzzle: KPuzzle, alg: string, start?: KPattern): KPattern {
   return normalizeOrientation(kpuzzle, (start ?? kpuzzle.defaultPattern()).applyAlg(alg))

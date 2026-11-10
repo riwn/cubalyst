@@ -88,7 +88,7 @@ INSERT INTO cases (id, case_set, name, case_group, alg, pattern, sort) VALUES
     ('pll-Gd', 'PLL', 'Gd perm', 'G', 'R U R'' U'' D R2 U'' R U'' R'' U R'' U R2 D''', 'UUUUUUUUUBBFRRRRRRFLRFFFFFFDDDDDDDDDLRLLLLLLLRFBBBBBBB', 74),
     ('pll-Na', 'PLL', 'Na perm', 'Diagonal', 'R U R'' U R U R'' F'' R U R'' U'' R'' F R2 U'' R'' U2 R U'' R''', 'UUUUUUUUURLLRRRRRRBFFFFFFFFDDDDDDDDDLRRLLLLLLFBBBBBBBB', 75),
     ('pll-Nb', 'PLL', 'Nb perm', 'Diagonal', 'R'' U R U'' R'' F'' U'' F R U R'' F R'' F'' R U'' R', 'UUUUUUUUULLRRRRRRRFFBFFFFFFDDDDDDDDDRRLLLLLLLBBFBBBBBB', 76),
-    ('pll-V', 'PLL', 'V perm', 'Diagonal', 'R'' U R'' U'' y R'' F'' R2 U'' R'' U R'' F R F', 'UUUUUUUUURFLRRRRRRBRFFFFFFFDDDDDDDDDLLRLLLLLLFBBBBBBBB', 77),
+    ('pll-V', 'PLL', 'V perm', 'Diagonal', 'R'' U R'' U'' y R'' F'' R2 U'' R'' U R'' F R F', 'UUUUUUUUULBRRRRRRRFFBFFFFFFDDDDDDDDDRLLLLLLLLBRFBBBBBB', 77),
     ('pll-Y', 'PLL', 'Y perm', 'Diagonal', 'F R U'' R'' U'' R U R'' F'' R U R'' U'' R'' F R F''', 'UUUUUUUUULRRRRRRRRFFBFFFFFFDDDDDDDDDRBLLLLLLLBLFBBBBBB', 78),
     ('f2l-1', 'F2L', 'F2L 1', '角・エッジとも上段', 'F'' U'' F', 'RUURUUUUFRBBURRURRFFDFFRFFRDDBDDDDDDFFLLLLLLLLLUBBBBBB', 79),
     ('f2l-2', 'F2L', 'F2L 2', '角・エッジとも上段', 'R U R''', 'FFUUUUUURDRRFRRFRRLLFFFUFFUDDLDDDDDDUBBLLLLLLBRRBBBBBB', 80),
