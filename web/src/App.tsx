@@ -16,7 +16,7 @@ import { setNavCollapsed, useNavCollapsed } from './ui/prefs'
 
 /**
  * 左のメニュー。match に当てはまるパスでも選択中にする（解析は履歴・統計・AI解析の3つのタブをまとめ、履歴から開く）。
- * 中継はヘッダーの LIVE から開く。
+ * 中継はヘッダーの「中継」から開く。
  */
 const NAV: { to: string; label: string; icon: ReactNode; end?: boolean; match?: RegExp }[] = [
   {
@@ -118,7 +118,7 @@ export default function App() {
                 aria-label="中継"
               >
                 <span className="live-dot" aria-hidden="true" />
-                LIVE
+                中継
               </NavLink>
               <CubeConnectionControl />
               <SystemMenu />

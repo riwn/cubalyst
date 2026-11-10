@@ -73,7 +73,7 @@ make dev
 
 ### キューブをつなぐ
 
-1. 画面右上の「Connect」を押し、表示された一覧からキューブを選びます
+1. 画面右上の「接続」を押し、表示された一覧からキューブを選びます
 2. GAN のキューブは、通信の暗号化に MAC アドレスを使います。自動で取れなかったときは入力欄が出るので、`chrome://bluetooth-internals` や OS の Bluetooth 設定で確認して入力します（ブラウザに保存され、次回からは聞かれません）
 
 Chrome で `chrome://flags/#enable-experimental-web-platform-features` を有効にすると、MAC アドレスを自動で取れることがあります。

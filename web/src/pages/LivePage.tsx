@@ -12,7 +12,7 @@ import { useLiveFeed } from '../live/hooks'
 
 /**
  * 中継：キューブをつないだブラウザ（メイン）のタイマー画面を映す。見るだけで、記録も操作もしない。
- * この端末のキューブ（右上の Connect）とは別のストアに映すので、ここでキューブをつないでも混ざらない。
+ * この端末のキューブ（右上の「接続」）とは別のストアに映すので、ここでキューブをつないでも混ざらない。
  */
 export function LivePage() {
   const { kpuzzle } = useCubeStore()

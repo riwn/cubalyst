@@ -67,7 +67,7 @@ export function TimerPage() {
             </>
           )}
           {status === 'disconnected' && (
-            <p className="muted center small">右上の「Connect」でキューブを接続すると、回転を記録して保存できます</p>
+            <p className="muted center small">右上の「接続」でキューブを接続すると、回転を記録して保存できます</p>
           )}
           {saveError && <p className="error">{saveError}</p>}
         </>

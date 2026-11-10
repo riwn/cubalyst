@@ -58,7 +58,7 @@ export function PracticeRunner({
               {overlay?.(state)}
             </>
           )}
-          {status === 'disconnected' && <p className="muted center small">右上の「Connect」でキューブを接続すると練習できます</p>}
+          {status === 'disconnected' && <p className="muted center small">右上の「接続」でキューブを接続すると練習できます</p>}
           {error && <p className="error">{error}</p>}
         </>
       }

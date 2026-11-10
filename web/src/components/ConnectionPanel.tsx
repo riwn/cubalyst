@@ -10,7 +10,7 @@ import { Dialog } from '../ui/Dialog'
 import { Popover } from '../ui/Popover'
 
 /**
- * ヘッダー右上のキューブ接続。未接続なら「Connect」、接続中はデバイス名とバッテリーを出し、
+ * ヘッダー右上のキューブ接続。未接続なら「接続」、接続中はデバイス名とバッテリーを出し、
  * 押すと詳細（状態リセット・切断など）を開く。
  */
 export function CubeConnectionControl() {
@@ -43,7 +43,7 @@ export function CubeConnectionControl() {
           disabled={!isWebBluetoothAvailable()}
           title={isWebBluetoothAvailable() ? 'キューブに接続' : 'Web Bluetoothが使えません（http://localhost から開いてください）'}
         >
-          Connect
+          接続
         </button>
       </div>
     )
