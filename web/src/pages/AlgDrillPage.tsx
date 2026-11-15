@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { createSolve, listCases, setCaseLearned, type CaseInfo } from '../api'
+import { createSolve, deleteCaseAlg, listCases, setCaseLearned, type CaseInfo } from '../api'
 import { formatAlgInfo } from '../cases/alg-info'
 import { algsFor, preferredAlg, savePreferredAlg } from '../cases/algs'
 import type { DrillAttempt } from '../cases/drill'
@@ -8,8 +8,10 @@ import type { CaseSetup, CaseSetupState } from '../cases/setup'
 import { scrambleBetween } from '../cases/exercise'
 import { invertRotation, normalizeOrientation } from '../cases/geometry'
 import { caseForAlg } from '../cases/seed'
-import { F2L_SLOTS, slotLabel, type F2LSlot } from '../cases/slots'
+import { F2L_SLOTS, slotAlg, slotLabel, type F2LSlot } from '../cases/slots'
 import { caseStats } from '../cases/stats'
+import { withTriggers } from '../cases/triggers'
+import { AlgImportPanel } from '../components/AlgImportPanel'
 import { CaseDiagram } from '../components/CaseDiagram'
 import { FitLayout } from '../components/FitLayout'
 import { MockControls } from '../components/MockControls'
@@ -77,6 +79,7 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
   const [tab, setTab] = useState<SetName>(() => setOf(initialCaseId) ?? 'OLL')
   const [selectedId, setSelectedId] = useState<string | null>(() => (setOf(initialCaseId) ? initialCaseId! : null))
   const [running, setRunning] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [chosenAlg, setChosenAlg] = useState<Record<string, string>>({})
   // F2L を練習するスロット。?case= で来たときは、統計のケース（右手前の形）をそのまま出す
   const [f2lSlot, setF2lSlot] = useState<F2LSlot>(() => (initialCaseId ? 'FR' : loadSlot()))
@@ -84,11 +87,12 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
   const history = useSolveList({ mode: 'case', limit: 0 })
   const stats = useMemo(() => caseStats(history.solves), [history.solves])
 
-  useEffect(() => {
+  const loadCases = useCallback(() => {
     listCases()
       .then(setCases)
       .catch((err: unknown) => setError(String(err)))
   }, [])
+  useEffect(loadCases, [loadCases])
 
   const selected = cases.find((c) => c.id === selectedId) ?? null
   const toggleLearned = (c: CaseInfo) => {
@@ -105,6 +109,15 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
   const chooseAlg = (c: CaseInfo, a: string) => {
     setChosenAlg((prev) => ({ ...prev, [`${c.id}.${slotOf(c)}`]: a }))
     savePreferredAlg(c.id, a, slotOf(c))
+  }
+  /** 追加した手順（そのスロットの手順で探す）。 */
+  const customAlg = (c: CaseInfo, a: string) => c.custom_algs?.find((x) => slotAlg(x.alg, slotOf(c)) === a)
+  const removeAlg = (c: CaseInfo, a: string) => {
+    const custom = customAlg(c, a)
+    if (!custom || !window.confirm(`追加した手順「${withTriggers(a)}」を消しますか？`)) return
+    deleteCaseAlg(c.id, custom.id)
+      .then(loadCases)
+      .catch((err: unknown) => setError(`手順を消せませんでした: ${String(err)}`))
   }
   const chooseSlot = (slot: F2LSlot) => {
     setF2lSlot(slot)
@@ -131,7 +144,11 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
           覚えた {inTab.filter((c) => c.learned).length} / {inTab.length}
         </span>
         <span className="muted small">練習したいケースを1つ選んでください。覚えたケースに印を付けると、ステップ練習で覚えた手順だけを出せます</span>
+        <span className="spacer" />
+        {!importing && <button onClick={() => setImporting(true)}>手順をインポート</button>}
       </section>
+
+      {importing && <AlgImportPanel cases={cases} onAdded={loadCases} onClose={() => setImporting(false)} />}
 
       {tab === 'F2L' && (
         <section className="panel row">
@@ -172,17 +189,31 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
                         checked={a === alg}
                         onChange={() => chooseAlg(selected, a)}
                       />
-                      <span className="alg">{a}</span>
+                      <span className="alg">{withTriggers(a)}</span>
                       <span className="muted small">
                         {formatAlgInfo(a)}
                         {i === 0 && ' ・ 標準'}
+                        {customAlg(selected, a) && ' ・ 追加'}
                       </span>
+                      {customAlg(selected, a) && (
+                        <button
+                          className="icon-button small"
+                          title="追加した手順を消す"
+                          aria-label="追加した手順を消す"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            removeAlg(selected, a)
+                          }}
+                        >
+                          ×
+                        </button>
+                      )}
                     </label>
                   ))}
                 </div>
               ) : (
                 <div className="alg drill-alg">
-                  {alg} <span className="muted small">{formatAlgInfo(alg)}</span>
+                  {withTriggers(alg)} <span className="muted small">{formatAlgInfo(alg)}</span>
                 </div>
               )}
               <div className="muted small">
@@ -216,7 +247,7 @@ export function AlgDrillPage({ initialCaseId }: { initialCaseId?: string | null 
                     key={c.id}
                     className={`case-card ${selectedId === c.id ? 'selected' : 'selectable'} ${c.learned ? 'learned' : ''}`}
                     onClick={() => setSelectedId(c.id)}
-                    title={algOf(c)}
+                    title={withTriggers(algOf(c))}
                   >
                     <CaseDiagram c={caseForAlg(store.kpuzzle, c, algOf(c))} slot={slotOf(c)} />
                     <div className="case-name">
@@ -367,7 +398,7 @@ function DrillView({
                 {c.name}
                 {c.set === 'F2L' && `（${slotLabel(slot)}）`}
               </strong>
-              <div className="alg drill-alg">{alg}</div>
+              <div className="alg drill-alg">{withTriggers(alg)}</div>
               <div className="muted small hide-narrow">
                 揃っていなくても大丈夫です。手順を回し終えるたびに自動で記録します（前後のAUF・別の面での実行もOK）。
               </div>

@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { listCases, type CaseInfo, type NewSolve, type Solve } from '../api'
 import { stickyAssist, viewFrom, type Assist, type StickyAssist } from '../assist/detect'
 import { preferredAlg } from '../cases/algs'
+import { withTriggers } from '../cases/triggers'
 import type { CaseDef } from '../cases/data'
 import { caseForAlg } from '../cases/seed'
 import { CaseDiagram } from '../components/CaseDiagram'
@@ -134,13 +135,15 @@ function AssistPanel({ cases, delay }: { cases: Map<string, CaseInfo>; delay: nu
     () => holdRotation(store.kpuzzle.defaultPattern(), settings.hold_bottom, settings.hold_front),
     [store.kpuzzle, settings.hold_bottom, settings.hold_front],
   )
+  // 手順練習で選んだ手順（追加した手順も選べるので、サーバーのケースで引く）
+  const algFor = useCallback((c: CaseDef) => preferredAlg(cases.get(c.id) ?? c), [cases])
   // 回転（と実機への再同期）ごとに判定する
   const [sticky, setSticky] = useState<StickyAssist>(() =>
-    stickyAssist(null, store.kpuzzle, viewFrom(store.kpuzzle, store.getSnapshot().pattern, rot), preferredAlg),
+    stickyAssist(null, store.kpuzzle, viewFrom(store.kpuzzle, store.getSnapshot().pattern, rot), algFor),
   )
   useEffect(() => {
     const update = (pattern: KPattern) =>
-      setSticky((prev) => stickyAssist(prev, store.kpuzzle, viewFrom(store.kpuzzle, pattern, rot), preferredAlg))
+      setSticky((prev) => stickyAssist(prev, store.kpuzzle, viewFrom(store.kpuzzle, pattern, rot), algFor))
     const offMoves = store.moves.subscribe(({ pattern }) => update(pattern))
     const offView = store.view.subscribe((u) => {
       if (u.type === 'replace') update(u.pattern)
@@ -149,7 +152,7 @@ function AssistPanel({ cases, delay }: { cases: Map<string, CaseInfo>; delay: nu
       offMoves()
       offView()
     }
-  }, [store, rot])
+  }, [store, rot, algFor])
   const assist = sticky.assist
   const turning = sticky.frozen > 0
 
@@ -273,7 +276,7 @@ function CaseHint({
             <div className="alg assist-alg">
               {steps.filter(Boolean).map((s, i) => (
                 <span key={i} className={/^[yU]/.test(s) && s.length <= 3 ? 'assist-setup' : ''}>
-                  {s}
+                  {withTriggers(s)}
                 </span>
               ))}
               {post && <span className="assist-setup">{post}</span>}

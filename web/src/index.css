@@ -2054,3 +2054,42 @@ button.danger-solid {
   width: auto;
   margin-top: 8px;
 }
+
+/* 手順のインポート：貼り付けた行ごとの確かめた結果 */
+.alg-import textarea {
+  margin: 0 0 8px;
+}
+
+.alg-import-rows {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.alg-import-rows li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 3px 0;
+  border-top: 1px solid var(--line);
+}
+
+.alg-import-mark {
+  width: 1em;
+  font-weight: 700;
+}
+
+.alg-import-rows .ok .alg-import-mark {
+  color: var(--ok);
+}
+
+.alg-import-rows .ng .alg-import-mark,
+.alg-import-message {
+  color: var(--error);
+}
+
+.drill-alg-choice .icon-button {
+  margin: 0 0 0 auto;
+}
