@@ -145,6 +145,8 @@ export function StatsPage() {
         <Tile label="best single" value={formatTime(b.single, 3)} />
         <Tile label="best ao5" value={formatTime(b.ao5)} sub={`現在 ${formatTime(b.currentAo5)}`} />
         <Tile label="best ao12" value={formatTime(b.ao12)} sub={`現在 ${formatTime(b.currentAo12)}`} />
+        <Tile label="best ao50" value={formatTime(b.ao50)} sub={`現在 ${formatTime(b.currentAo50)}`} />
+        <Tile label="best ao100" value={formatTime(b.ao100)} sub={`現在 ${formatTime(b.currentAo100)}`} />
         <Tile label="ソルブ数" value={String(b.count)} sub={b.dnf ? `DNF ${b.dnf}` : undefined} />
       </section>
 

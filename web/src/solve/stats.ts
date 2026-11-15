@@ -8,20 +8,26 @@ export function effectiveTime(totalMs: number, penalty: Penalty): number | null 
   return penalty === '+2' ? totalMs + 2000 : totalMs
 }
 
+/** aoN で上下から除く件数。ao5・ao12 は1件ずつ（WCA）、それより多いときは 5% ずつ（切り上げ。ao50 は3、ao100 は5）。 */
+export function trimCount(n: number): number {
+  return Math.max(1, Math.ceil(n * 0.05))
+}
+
 /**
- * WCA方式の平均（aoN）。最良と最悪を1つずつ除いて平均する。
- * DNFは最悪として扱い、2つ以上含まれる場合はDNF（null）。件数が足りなければ undefined。
+ * WCA方式の平均（aoN）。最良と最悪を trimCount(N) 件ずつ除いて平均する。
+ * DNFは最悪として扱い、除く件数より多く含まれる場合はDNF（null）。件数が足りなければ undefined。
  * 平均はWCAに合わせて10ms単位に丸める。
  */
 export function averageOf(times: (number | null)[]): number | null | undefined {
   const n = times.length
   if (n < 3) return undefined
+  const trim = trimCount(n)
   const dnfs = times.filter((t) => t == null).length
-  if (dnfs >= 2) return null
+  if (dnfs > trim) return null
   const sorted = times
     .map((t) => (t == null ? Infinity : t))
     .sort((a, b) => a - b)
-    .slice(1, n - 1)
+    .slice(trim, n - trim)
   const mean = sorted.reduce((a, b) => a + b, 0) / sorted.length
   return Math.round(mean / 10) * 10
 }

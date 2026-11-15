@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -26,7 +27,32 @@ const SERIES = [
   { key: 'single', label: 'single', color: 'var(--series-1)' },
   { key: 'ao5', label: 'ao5', color: 'var(--series-2)' },
   { key: 'ao12', label: 'ao12', color: 'var(--series-3)' },
+  { key: 'ao50', label: 'ao50', color: 'var(--series-4)' },
+  { key: 'ao100', label: 'ao100', color: 'var(--series-5)' },
 ] as const
+type SeriesKey = (typeof SERIES)[number]['key']
+
+// 推移で描く系列。線が多いと見づらいので、既定は single・ao12・ao100。凡例を押して切り替え、ブラウザに覚える
+const SHOWN_KEY = 'cubalyst.trend.series'
+const DEFAULT_SHOWN: SeriesKey[] = ['single', 'ao12', 'ao100']
+
+function loadShown(): Set<SeriesKey> {
+  try {
+    const v = JSON.parse(localStorage.getItem(SHOWN_KEY) ?? 'null')
+    if (Array.isArray(v)) return new Set(v.filter((k): k is SeriesKey => SERIES.some((s) => s.key === k)))
+  } catch {
+    // 読めなければ既定
+  }
+  return new Set(DEFAULT_SHOWN)
+}
+
+function saveShown(shown: Set<SeriesKey>) {
+  try {
+    localStorage.setItem(SHOWN_KEY, JSON.stringify([...shown]))
+  } catch {
+    // 保存できなくても表示は変わる
+  }
+}
 
 function TrendTooltip({ active, payload }: TooltipContentProps<ValueType, NameType>) {
   if (!active || !payload?.length) return null
@@ -51,6 +77,8 @@ type TrendDatum = TrendPoint & {
   singleV?: number
   ao5V?: number
   ao12V?: number
+  ao50V?: number
+  ao100V?: number
   clipped?: 'under' | 'over'
 }
 
@@ -66,7 +94,7 @@ function SingleDot(props: { cx?: number; cy?: number; index?: number; payload?: 
 }
 
 /**
- * 推移：single（点）と ao5 / ao12（線）。DNFは描かない。
+ * 推移：single（点）と ao5 / ao12 / ao50 / ao100（線）。DNFは描かない。凡例を押すと系列を出し入れできる。
  * fences を渡すと縦軸をその範囲に絞り、はみ出した single は端に三角で置く（値はツールチップで見られる）。
  */
 export function TrendChart({ points, fences }: { points: TrendPoint[]; fences?: Fences | null }) {
@@ -80,20 +108,37 @@ export function TrendChart({ points, fences }: { points: TrendPoint[]; fences?: 
       singleV: clipped === 'over' ? hi : clipped === 'under' ? lo : (p.single ?? undefined),
       ao5V: p.ao5 ?? undefined,
       ao12V: p.ao12 ?? undefined,
+      ao50V: p.ao50 ?? undefined,
+      ao100V: p.ao100 ?? undefined,
       clipped,
     }
   })
-  const clippedCount = data.filter((d) => d.clipped).length
+  const [shown, setShown] = useState(loadShown)
+  const toggle = (key: SeriesKey) => {
+    const next = new Set(shown)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    setShown(next)
+    saveShown(next)
+  }
+  const clippedCount = shown.has('single') ? data.filter((d) => d.clipped).length : 0
   const last = points[points.length - 1]
   return (
     <>
       <div className="legend">
         {SERIES.map((s) => (
-          <span key={s.key}>
+          <button
+            key={s.key}
+            type="button"
+            className="legend-toggle"
+            aria-pressed={shown.has(s.key)}
+            title={shown.has(s.key) ? `${s.label} を隠す` : `${s.label} を出す`}
+            onClick={() => toggle(s.key)}
+          >
             <span className={`legend-key ${s.key === 'single' ? 'dot' : ''}`} style={{ background: s.color }} />
             {s.label}
-            {last && <strong> {formatTime(last[s.key], 2)}</strong>}
-          </span>
+            {last && <strong>&nbsp;{formatTime(last[s.key], 2)}</strong>}
+          </button>
         ))}
         {clippedCount > 0 && <span className="muted">外れ値 {clippedCount}件は端に ▲▼</span>}
       </div>
@@ -110,15 +155,25 @@ export function TrendChart({ points, fences }: { points: TrendPoint[]; fences?: 
               allowDataOverflow={fences != null}
             />
             <Tooltip content={TrendTooltip} cursor={{ stroke: 'var(--viz-muted)', strokeWidth: 1 }} />
-            <Line
-              dataKey="singleV"
-              stroke="none"
-              dot={SingleDot}
-              activeDot={{ r: 5, fill: 'var(--series-1)', stroke: 'var(--viz-surface)', strokeWidth: 2 }}
-              isAnimationActive={false}
-            />
-            <Line dataKey="ao5V" stroke="var(--series-2)" strokeWidth={2} dot={false} isAnimationActive={false} />
-            <Line dataKey="ao12V" stroke="var(--series-3)" strokeWidth={2} dot={false} isAnimationActive={false} />
+            {shown.has('single') && (
+              <Line
+                dataKey="singleV"
+                stroke="none"
+                dot={SingleDot}
+                activeDot={{ r: 5, fill: 'var(--series-1)', stroke: 'var(--viz-surface)', strokeWidth: 2 }}
+                isAnimationActive={false}
+              />
+            )}
+            {SERIES.filter((s) => s.key !== 'single' && shown.has(s.key)).map((s) => (
+              <Line
+                key={s.key}
+                dataKey={`${s.key}V`}
+                stroke={s.color}
+                strokeWidth={s.key === 'ao100' ? 2.5 : 2}
+                dot={false}
+                isAnimationActive={false}
+              />
+            ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
