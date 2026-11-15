@@ -14,7 +14,7 @@ import {
   type TooltipContentProps,
 } from 'recharts'
 import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent'
-import type { Bin, TrendPoint } from '../solve/aggregate'
+import type { Bin, Fences, TrendPoint } from '../solve/aggregate'
 import { GROUP_LABELS, groupSplits, type Split, type StageGroup } from '../solve/cfop'
 import { formatTime } from '../solve/stats'
 import { formatDate } from '../format'
@@ -47,15 +47,43 @@ function TrendTooltip({ active, payload }: TooltipContentProps<ValueType, NameTy
   )
 }
 
-/** 推移：single（点）と ao5 / ao12（線）。DNFは描かない。 */
-export function TrendChart({ points }: { points: TrendPoint[] }) {
+type TrendDatum = TrendPoint & {
+  singleV?: number
+  ao5V?: number
+  ao12V?: number
+  clipped?: 'under' | 'over'
+}
+
+/** single の点。軸の外にはみ出したものは、端に三角（▲／▼）で置く。 */
+function SingleDot(props: { cx?: number; cy?: number; index?: number; payload?: TrendDatum }) {
+  const { cx, cy, index, payload } = props
+  if (cx == null || cy == null || payload?.singleV == null) return <g key={index} />
+  if (payload.clipped) {
+    const d = payload.clipped === 'over' ? `M${cx},${cy - 1} l-4,7 h8 z` : `M${cx},${cy + 1} l-4,-7 h8 z`
+    return <path key={index} d={d} fill="none" stroke="var(--series-1)" strokeWidth={1.5} />
+  }
+  return <circle key={index} cx={cx} cy={cy} r={2.5} fill="var(--series-1)" />
+}
+
+/**
+ * 推移：single（点）と ao5 / ao12（線）。DNFは描かない。
+ * fences を渡すと縦軸をその範囲に絞り、はみ出した single は端に三角で置く（値はツールチップで見られる）。
+ */
+export function TrendChart({ points, fences }: { points: TrendPoint[]; fences?: Fences | null }) {
+  const lo = fences ? Math.floor(fences.lo / 1000) * 1000 : undefined
+  const hi = fences ? Math.ceil(fences.hi / 1000) * 1000 : undefined
   // DNF(null)・未定義は描画から外す
-  const data = points.map((p) => ({
-    ...p,
-    singleV: p.single ?? undefined,
-    ao5V: p.ao5 ?? undefined,
-    ao12V: p.ao12 ?? undefined,
-  }))
+  const data: TrendDatum[] = points.map((p) => {
+    const clipped = p.single == null ? undefined : hi != null && p.single > hi ? 'over' : lo != null && p.single < lo ? 'under' : undefined
+    return {
+      ...p,
+      singleV: clipped === 'over' ? hi : clipped === 'under' ? lo : (p.single ?? undefined),
+      ao5V: p.ao5 ?? undefined,
+      ao12V: p.ao12 ?? undefined,
+      clipped,
+    }
+  })
+  const clippedCount = data.filter((d) => d.clipped).length
   const last = points[points.length - 1]
   return (
     <>
@@ -67,18 +95,25 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
             {last && <strong> {formatTime(last[s.key], 2)}</strong>}
           </span>
         ))}
+        {clippedCount > 0 && <span className="muted">外れ値 {clippedCount}件は端に ▲▼</span>}
       </div>
       <div className="chart">
         <ResponsiveContainer>
           <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="var(--viz-grid)" vertical={false} />
             <XAxis dataKey="n" {...AXIS} type="number" domain={['dataMin', 'dataMax']} allowDecimals={false} />
-            <YAxis {...AXIS} tickFormatter={secTick} width={40} domain={['auto', 'auto']} />
+            <YAxis
+              {...AXIS}
+              tickFormatter={secTick}
+              width={40}
+              domain={lo != null && hi != null ? [lo, hi] : ['auto', 'auto']}
+              allowDataOverflow={fences != null}
+            />
             <Tooltip content={TrendTooltip} cursor={{ stroke: 'var(--viz-muted)', strokeWidth: 1 }} />
             <Line
               dataKey="singleV"
               stroke="none"
-              dot={{ r: 2.5, fill: 'var(--series-1)', stroke: 'none' }}
+              dot={SingleDot}
               activeDot={{ r: 5, fill: 'var(--series-1)', stroke: 'var(--viz-surface)', strokeWidth: 2 }}
               isAnimationActive={false}
             />
@@ -92,6 +127,8 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
 }
 
 function binLabel(b: Bin) {
+  if (b.edge === 'over') return `${(b.to / 1000).toFixed(2)}s まで（${(b.from / 1000).toFixed(2)}s 以上の外れ値）`
+  if (b.edge === 'under') return `${(b.from / 1000).toFixed(2)}s から（${(b.to / 1000).toFixed(2)}s 未満の外れ値）`
   return `${(b.from / 1000).toFixed(2)}–${(b.to / 1000).toFixed(2)}s`
 }
 
@@ -105,18 +142,24 @@ function HistogramTooltip({ active, payload }: TooltipContentProps<ValueType, Na
   )
 }
 
-/** 分布：タイムのヒストグラム。 */
+const binTick = (b: Bin) => (b.edge === 'over' ? `${secTick(b.from)}〜` : b.edge === 'under' ? `〜${secTick(b.to)}` : secTick(b.from))
+
+/** 分布：タイムのヒストグラム。外れ値をまとめた端のビン（edge）は薄い色で描く。 */
 export function HistogramChart({ bins }: { bins: Bin[] }) {
-  const data = bins.map((b) => ({ ...b, mid: (b.from + b.to) / 2 }))
+  const data = bins.map((b) => ({ ...b, tick: binTick(b) }))
   return (
     <div className="chart">
       <ResponsiveContainer>
         <BarChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }} barCategoryGap={2}>
           <CartesianGrid stroke="var(--viz-grid)" vertical={false} />
-          <XAxis dataKey="from" {...AXIS} tickFormatter={secTick} />
+          <XAxis dataKey="tick" {...AXIS} />
           <YAxis {...AXIS} allowDecimals={false} width={32} />
           <Tooltip content={HistogramTooltip} cursor={{ fill: 'var(--viz-grid)', opacity: 0.5 }} />
-          <Bar dataKey="count" fill="var(--series-1)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+          <Bar dataKey="count" fill="var(--series-1)" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+            {data.map((b, i) => (
+              <Cell key={i} fill="var(--series-1)" fillOpacity={b.edge ? 0.4 : 1} />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>

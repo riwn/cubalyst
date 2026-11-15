@@ -43,23 +43,62 @@ export function bests(points: TrendPoint[]): Bests {
   }
 }
 
-export type Bin = { from: number; to: number; count: number }
+/** 外れ値の境。lo 未満・hi 超えを外れ値とみなす。 */
+export type Fences = { lo: number; hi: number }
+
+function quantile(sorted: number[], q: number) {
+  const pos = (sorted.length - 1) * q
+  const i = Math.floor(pos)
+  return i + 1 < sorted.length ? sorted[i] + (sorted[i + 1] - sorted[i]) * (pos - i) : sorted[i]
+}
+
+/**
+ * 外れ値の境（Tukey の柵：Q1 − k×IQR 〜 Q3 + k×IQR）。DNF（null）は除く。
+ * 件数が少ないとき、または外れ値が無いときは null（グラフはそのまま全部を描く）。
+ */
+export function outlierFences(values: (number | null | undefined)[], k = 1.5): Fences | null {
+  const v = values.filter((t): t is number => t != null).sort((a, b) => a - b)
+  if (v.length < 8) return null
+  const q1 = quantile(v, 0.25)
+  const q3 = quantile(v, 0.75)
+  const iqr = q3 - q1
+  const lo = q1 - k * iqr
+  const hi = q3 + k * iqr
+  if (v[0] >= lo && v[v.length - 1] <= hi) return null
+  return { lo: Math.max(lo, v[0]), hi: Math.min(hi, v[v.length - 1]) }
+}
+
+/** edge：外れ値をまとめた端のビン（under＝lo 未満、over＝hi 超え）。 */
+export type Bin = { from: number; to: number; count: number; edge?: 'under' | 'over' }
 
 const BIN_WIDTHS = [250, 500, 1000, 2000, 5000]
 
-/** ヒストグラム。DNFを除き、ビン数がおよそ target 以下になる幅を選ぶ。 */
-export function histogram(times: (number | null)[], target = 20): { bins: Bin[]; dnf: number; width: number } {
+/**
+ * ヒストグラム。DNFを除き、ビン数がおよそ target 以下になる幅を選ぶ。
+ * fences を渡すと、その外のタイムは両端の1本ずつのビン（edge）にまとめ、幅は内側だけで決める。
+ */
+export function histogram(
+  times: (number | null)[],
+  target = 20,
+  fences?: Fences | null,
+): { bins: Bin[]; dnf: number; width: number; outliers: number } {
   const valid = times.filter((t): t is number => t != null)
   const dnf = times.length - valid.length
-  if (valid.length === 0) return { bins: [], dnf, width: 0 }
-  const min = Math.min(...valid)
-  const max = Math.max(...valid)
+  const under = fences ? valid.filter((t) => t < fences.lo) : []
+  const over = fences ? valid.filter((t) => t > fences.hi) : []
+  const inside = fences ? valid.filter((t) => t >= fences.lo && t <= fences.hi) : valid
+  const outliers = under.length + over.length
+  if (inside.length === 0) return { bins: [], dnf, width: 0, outliers }
+  const min = Math.min(...inside)
+  const max = Math.max(...inside)
   const width = BIN_WIDTHS.find((w) => (max - min) / w <= target) ?? BIN_WIDTHS[BIN_WIDTHS.length - 1]
   const start = Math.floor(min / width) * width
   const n = Math.floor((max - start) / width) + 1
   const bins: Bin[] = Array.from({ length: n }, (_, i) => ({ from: start + i * width, to: start + (i + 1) * width, count: 0 }))
-  for (const t of valid) bins[Math.min(n - 1, Math.floor((t - start) / width))].count++
-  return { bins, dnf, width }
+  for (const t of inside) bins[Math.min(n - 1, Math.floor((t - start) / width))].count++
+  if (under.length) bins.unshift({ from: Math.min(...under), to: start, count: under.length, edge: 'under' })
+  if (over.length) bins.push({ from: start + n * width, to: Math.max(...over), count: over.length, edge: 'over' })
+  return { bins, dnf, width, outliers }
 }
 
 export type StageStat = { ms: number; moves: number; share: number; tps: number }
