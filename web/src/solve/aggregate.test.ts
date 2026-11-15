@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Solve } from '../api'
-import { bests, histogram, stageStats, trend } from './aggregate'
+import { bests, histogram, outlierFences, stageStats, trend } from './aggregate'
 import type { Split } from './cfop'
 
 function solve(ms: number, penalty: Solve['penalty'] = '', splits?: Split[]): Solve {
@@ -43,7 +43,34 @@ describe('histogram', () => {
     expect(histogram([5000, 60000]).width).toBe(5000)
   })
   it('handles empty input', () => {
-    expect(histogram([null])).toEqual({ bins: [], dnf: 1, width: 0 })
+    expect(histogram([null])).toEqual({ bins: [], dnf: 1, width: 0, outliers: 0 })
+  })
+})
+
+describe('outlierFences', () => {
+  const base = [40000, 41000, 42000, 43000, 44000, 45000, 46000, 47000, 48000, 50000]
+  it('returns null when there is no outlier or too few solves', () => {
+    expect(outlierFences(base)).toBeNull()
+    expect(outlierFences([10000, 99000, null])).toBeNull()
+  })
+  it('fences off a slow outlier and ignores DNF', () => {
+    const f = outlierFences([...base, 99700, null])
+    expect(f).not.toBeNull()
+    expect(f!.hi).toBeGreaterThan(50000)
+    expect(f!.hi).toBeLessThan(99700)
+    expect(f!.lo).toBe(40000) // 下の柵がデータより下なら最小値にそろえる
+  })
+})
+
+describe('histogram with fences', () => {
+  it('gathers outliers into edge bins and sizes bins from the inside', () => {
+    const times = [5000, 40100, 41200, 42300, 43400, 99700]
+    const h = histogram(times, 20, { lo: 40000, hi: 50000 })
+    expect(h.width).toBe(250) // 内側（40.1〜43.4秒）だけで幅を決める
+    expect(h.outliers).toBe(2)
+    expect(h.bins[0]).toEqual({ from: 5000, to: 40000, count: 1, edge: 'under' })
+    expect(h.bins[h.bins.length - 1]).toEqual({ from: 43500, to: 99700, count: 1, edge: 'over' })
+    expect(h.bins.reduce((a, b) => a + b.count, 0)).toBe(6)
   })
 })
 

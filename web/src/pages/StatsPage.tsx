@@ -7,7 +7,7 @@ import { CaseStatsPanel } from '../components/CaseStatsPanel'
 import { TargetPanel } from '../components/TargetPanel'
 import { HistogramChart, TrendChart } from '../components/charts'
 import { formatDate, isFullSolve, MODE_LABELS, multiTitle } from '../format'
-import { bests, histogram, stageStats, trend } from '../solve/aggregate'
+import { bests, histogram, outlierFences, stageStats, trend } from '../solve/aggregate'
 import { GROUP_LABELS, STAGE_LABELS, STAGES, type StageGroup } from '../solve/cfop'
 import { useSolveList } from '../solve/hooks'
 import { effectiveTime, formatTime } from '../solve/stats'
@@ -51,6 +51,7 @@ export function StatsPage() {
   const [caseId, setCaseId] = useState('')
   const [step, setStep] = useState('')
   const [histN, setHistN] = useState(100)
+  const [showOutliers, setShowOutliers] = useState(false)
 
   const range =
     period === 'custom'
@@ -73,10 +74,12 @@ export function StatsPage() {
 
   const points = useMemo(() => trend(solves), [solves])
   const b = useMemo(() => bests(points), [points])
-  const hist = useMemo(
-    () => histogram(solves.slice(-histN).map((s) => effectiveTime(s.total_ms, s.penalty))),
-    [solves, histN],
-  )
+  // 外れ値（Tukey の柵の外）は、既定では軸から外して端にまとめる
+  const trendFences = useMemo(() => (showOutliers ? null : outlierFences(points.map((p) => p.single))), [points, showOutliers])
+  const hist = useMemo(() => {
+    const times = solves.slice(-histN).map((s) => effectiveTime(s.total_ms, s.penalty))
+    return histogram(times, 20, showOutliers ? null : outlierFences(times))
+  }, [solves, histN, showOutliers])
   const stages = useMemo(() => stageStats(solves), [solves])
 
   return (
@@ -131,6 +134,9 @@ export function StatsPage() {
             </select>
           </label>
         )}
+        <label>
+          <input type="checkbox" checked={showOutliers} onChange={(e) => setShowOutliers(e.target.checked)} /> 外れ値も軸に入れる
+        </label>
         <span className="muted">{solves.length}件</span>
       </section>
       {error && <p className="error">{error}</p>}
@@ -148,7 +154,7 @@ export function StatsPage() {
         <>
           <section className="panel">
             <h3>推移</h3>
-            <TrendChart points={points} />
+            <TrendChart points={points} fences={trendFences} />
           </section>
 
           <section className="panel">
@@ -167,7 +173,8 @@ export function StatsPage() {
                 件
               </label>
               <span className="muted small">
-                ビン幅 {hist.width / 1000}秒{hist.dnf > 0 && ` ・ DNF ${hist.dnf}件（表示外）`}
+                ビン幅 {hist.width / 1000}秒{hist.outliers > 0 && ` ・ 外れ値 ${hist.outliers}件は端のビン`}
+                {hist.dnf > 0 && ` ・ DNF ${hist.dnf}件（表示外）`}
               </span>
             </div>
             <HistogramChart bins={hist.bins} />
