@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -131,5 +132,52 @@ func TestCasesAPI(t *testing.T) {
 	json.Unmarshal(do(t, h, http.MethodGet, "/api/cases?set=PLL", "").Body.Bytes(), &pll)
 	if len(pll) != 21 || pll[0].Set != "PLL" || len(pll[0].Pattern) != 54 || pll[0].Alg == "" {
 		t.Fatalf("pll: %+v", pll)
+	}
+}
+
+func TestCaseAlgsAPI(t *testing.T) {
+	h := newTestServer(t, t.TempDir())
+	rec := do(t, h, http.MethodPost, "/api/cases/oll-33/algs", `{"alg":"  L' U' L U  L F' L' F "}`)
+	if rec.Code != http.StatusCreated || !strings.Contains(rec.Body.String(), `"alg":"L' U' L U L F' L' F"`) {
+		t.Fatalf("post: %d %s", rec.Code, rec.Body)
+	}
+	var created CaseAlg
+	json.Unmarshal(rec.Body.Bytes(), &created)
+	if rec := do(t, h, http.MethodPost, "/api/cases/oll-33/algs", `{"alg":"L' U' L U L F' L' F"}`); rec.Code != http.StatusConflict {
+		t.Fatalf("duplicate: %d", rec.Code)
+	}
+	// 標準手順と同じ手順は足さない
+	if rec := do(t, h, http.MethodPost, "/api/cases/oll-33/algs", `{"alg":"R U R' U' R' F R F'"}`); rec.Code != http.StatusConflict {
+		t.Fatalf("standard: %d", rec.Code)
+	}
+	for _, body := range []string{`{"alg":""}`, `{"alg":"(R U R' U')"}`, `{"alg":"R3"}`, `{"alg":"Rw U"}`} {
+		if rec := do(t, h, http.MethodPost, "/api/cases/oll-33/algs", body); rec.Code != http.StatusBadRequest {
+			t.Fatalf("%s: %d", body, rec.Code)
+		}
+	}
+	if rec := do(t, h, http.MethodPost, "/api/cases/oll-99/algs", `{"alg":"R U"}`); rec.Code != http.StatusNotFound {
+		t.Fatalf("unknown case: %d", rec.Code)
+	}
+
+	var all []Case
+	json.Unmarshal(do(t, h, http.MethodGet, "/api/cases?set=OLL", "").Body.Bytes(), &all)
+	for _, c := range all {
+		want := 0
+		if c.ID == "oll-33" {
+			want = 1
+		}
+		if len(c.CustomAlgs) != want {
+			t.Fatalf("%s: %+v", c.ID, c.CustomAlgs)
+		}
+	}
+
+	if rec := do(t, h, http.MethodDelete, "/api/cases/oll-21/algs/"+strconv.FormatInt(created.ID, 10), ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("delete from another case: %d", rec.Code)
+	}
+	if rec := do(t, h, http.MethodDelete, "/api/cases/oll-33/algs/"+strconv.FormatInt(created.ID, 10), ""); rec.Code != http.StatusNoContent {
+		t.Fatalf("delete: %d", rec.Code)
+	}
+	if rec := do(t, h, http.MethodDelete, "/api/cases/oll-33/algs/"+strconv.FormatInt(created.ID, 10), ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("delete again: %d", rec.Code)
 	}
 }

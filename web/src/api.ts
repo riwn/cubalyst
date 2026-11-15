@@ -175,10 +175,24 @@ export type CaseInfo = {
   pattern: string
   /** 手順練習で「覚えた」と印を付けたか。 */
   learned: boolean
+  /** 手順練習でケースに追加した手順（追加した順）。 */
+  custom_algs?: CaseAlg[]
 }
+
+/** ケースに追加した手順。 */
+export type CaseAlg = { id: number; alg: string }
 
 export function listCases(): Promise<CaseInfo[]> {
   return request('/api/cases')
+}
+
+/** ケースに手順を追加する（標準の向き・右手前のスロットで、括弧を外した手順）。 */
+export function addCaseAlg(caseId: string, alg: string): Promise<CaseAlg & { case_id: string }> {
+  return request(`/api/cases/${caseId}/algs`, { method: 'POST', body: JSON.stringify({ alg }) })
+}
+
+export function deleteCaseAlg(caseId: string, algId: number): Promise<void> {
+  return request(`/api/cases/${caseId}/algs/${algId}`, { method: 'DELETE' })
 }
 
 export function setCaseLearned(id: string, learned: boolean): Promise<void> {

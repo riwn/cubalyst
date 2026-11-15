@@ -86,9 +86,15 @@ export const ALT_ALGS: Record<string, string[]> = {
   'f2l-41': ["R U R' U2 R U' R' U R U R'"],
 }
 
-/** ケースで選べる手順（先頭が標準手順）。F2L は、スロットを渡すとそのスロットの手順にする。 */
-export function algsFor(c: { id: string; alg: string }, slot: F2LSlot = 'FR'): string[] {
-  return [c.alg, ...(ALT_ALGS[c.id] ?? [])].map((a) => slotAlg(a, slot))
+type CaseAlgs = { id: string; alg: string; custom_algs?: { alg: string }[] }
+
+/**
+ * ケースで選べる手順（先頭が標準手順、次に別手順、最後に手順練習で追加した手順）。
+ * F2L は、スロットを渡すとそのスロットの手順にする。
+ */
+export function algsFor(c: CaseAlgs, slot: F2LSlot = 'FR'): string[] {
+  const all = [c.alg, ...(ALT_ALGS[c.id] ?? []), ...(c.custom_algs ?? []).map((a) => a.alg)]
+  return [...new Set(all)].map((a) => slotAlg(a, slot))
 }
 
 // 右手前の手順は、スロットを分ける前からのキーのまま
@@ -102,13 +108,13 @@ export const usesF = (alg: string) => alg.split(/\s+/).some((m) => m[0] === 'F')
  * F2L の F はエッジの向きを直すためなので、R・U（と持ち替えて左手）で回せる手順を先に練習できるようにする。
  * ほかのスロットでは、右手前で選ぶ手順を鏡写しにしたものにする。
  */
-export function defaultAlg(c: { id: string; alg: string }, slot: F2LSlot = 'FR'): string {
+export function defaultAlg(c: CaseAlgs, slot: F2LSlot = 'FR'): string {
   if (!c.id.startsWith('f2l-') || !usesF(c.alg)) return slotAlg(c.alg, slot)
   return slotAlg(algsFor(c).find((a) => !usesF(a)) ?? c.alg, slot)
 }
 
 /** 手順練習で前回選んだ手順（選べる手順に無ければ初めて選ぶときの手順）。 */
-export function preferredAlg(c: { id: string; alg: string }, slot: F2LSlot = 'FR'): string {
+export function preferredAlg(c: CaseAlgs, slot: F2LSlot = 'FR'): string {
   try {
     const v = localStorage.getItem(algKey(c.id, slot))
     if (v && algsFor(c, slot).includes(v)) return v

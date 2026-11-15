@@ -366,6 +366,58 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/cases/{id}/algs:
+    parameters:
+      - { name: id, in: path, required: true, description: ケースの ID, schema: { type: string } }
+    post:
+      tags: [ケース]
+      summary: ケースに手順を追加する
+      description: |
+        手順練習で選べる手順を足す。手順は標準の向き（上面＝最終層、下面＝クロス、F2L は右手前のスロット）で、
+        括弧を外した手の並び（面・ワイドムーブ・スライス・持ち替えに ' か 2）。そのケースを解けるかは、送る前に画面で確かめる
+      operationId: postCaseAlg
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [alg]
+              additionalProperties: false
+              properties:
+                alg: { type: string, example: "R U R' U' R' F R F'" }
+      responses:
+        "201":
+          description: 追加した
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer, format: int64 }
+                  case_id: { type: string }
+                  alg: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: 同じ手順が既にある
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/cases/{id}/algs/{algId}:
+    parameters:
+      - { name: id, in: path, required: true, description: ケースの ID, schema: { type: string } }
+      - { name: algId, in: path, required: true, description: 追加した手順の ID, schema: { type: integer, format: int64 } }
+    delete:
+      tags: [ケース]
+      summary: 追加した手順を消す
+      operationId: deleteCaseAlg
+      responses:
+        "204": { description: 消した }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/settings:
     get:
       tags: [設定]
@@ -807,6 +859,14 @@ components:
         alg: { type: string, description: 手順 }
         pattern: { type: string }
         learned: { type: boolean }
+        custom_algs:
+          type: array
+          description: 手順練習でケースに追加した手順（追加した順）
+          items:
+            type: object
+            properties:
+              id: { type: integer, format: int64 }
+              alg: { type: string }
 
     AnalysisInput:
       type: object
