@@ -1097,6 +1097,7 @@ a:hover {
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --series-4: #eda100;
+  --series-5: #8a5cc7;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1111,6 +1112,7 @@ a:hover {
     --series-2: #d95926;
     --series-3: #199e70;
     --series-4: #c98500;
+    --series-5: #9b74d6;
   }
 }
 
@@ -1120,7 +1122,7 @@ a:hover {
 
 .stat-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 12px;
 }
 
@@ -1151,7 +1153,8 @@ a:hover {
 
 .legend {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 4px 16px;
   font-size: 0.85rem;
   color: var(--viz-ink-2);
 }
@@ -2092,4 +2095,19 @@ button.danger-solid {
 
 .drill-alg-choice .icon-button {
   margin: 0 0 0 auto;
+}
+
+.legend-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.legend-toggle[aria-pressed='false'] {
+  opacity: 0.4;
 }

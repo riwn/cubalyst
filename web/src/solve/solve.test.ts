@@ -83,6 +83,17 @@ describe('stats', () => {
     expect(averageOf([10001, 10002, 10006, 10000, 99999])).toBe(10000)
     expect(averageOf([1, 2])).toBeUndefined()
   })
+  it('averageOf trims 5% from each side for larger averages', () => {
+    // ao50：上下3件ずつ除く。1〜50秒なら 4〜47秒の平均 = 25.5秒
+    const fifty = Array.from({ length: 50 }, (_, i) => (i + 1) * 1000)
+    expect(averageOf(fifty)).toBe(25500)
+    // DNF 3件までは最悪として除かれ、4件でDNF
+    expect(averageOf([...fifty.slice(0, 47), null, null, null])).toBe(25500) // 4〜47秒の平均
+    expect(averageOf([...fifty.slice(0, 46), null, null, null, null])).toBeNull()
+    // ao100：上下5件ずつ
+    const hundred = Array.from({ length: 100 }, (_, i) => (i + 1) * 1000)
+    expect(averageOf(hundred)).toBe(50500)
+  })
   it('rollingAverages', () => {
     expect(rollingAverages([1000, 2000, 3000, 4000, 5000, 6000], 5)).toEqual([
       undefined, undefined, undefined, undefined, 3000, 4000,

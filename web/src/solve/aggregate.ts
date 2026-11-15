@@ -10,22 +10,38 @@ export type TrendPoint = {
   single: number | null
   ao5: number | null | undefined
   ao12: number | null | undefined
+  ao50: number | null | undefined
+  ao100: number | null | undefined
 }
 
-/** 推移：各ソルブ時点の single / ao5 / ao12。 */
+/** 推移：各ソルブ時点の single / ao5 / ao12 / ao50 / ao100。 */
 export function trend(solves: Solve[]): TrendPoint[] {
   const times = solves.map((s) => effectiveTime(s.total_ms, s.penalty))
   const ao5 = rollingAverages(times, 5)
   const ao12 = rollingAverages(times, 12)
-  return solves.map((s, i) => ({ n: i + 1, solvedAt: s.solved_at, single: times[i], ao5: ao5[i], ao12: ao12[i] }))
+  const ao50 = rollingAverages(times, 50)
+  const ao100 = rollingAverages(times, 100)
+  return solves.map((s, i) => ({
+    n: i + 1,
+    solvedAt: s.solved_at,
+    single: times[i],
+    ao5: ao5[i],
+    ao12: ao12[i],
+    ao50: ao50[i],
+    ao100: ao100[i],
+  }))
 }
 
 export type Bests = {
   single: number | undefined
   ao5: number | undefined
   ao12: number | undefined
+  ao50: number | undefined
+  ao100: number | undefined
   currentAo5: number | null | undefined
   currentAo12: number | null | undefined
+  currentAo50: number | null | undefined
+  currentAo100: number | null | undefined
   count: number
   dnf: number
 }
@@ -37,7 +53,11 @@ export function bests(points: TrendPoint[]): Bests {
     ao5: best(points.map((p) => p.ao5)),
     ao12: best(points.map((p) => p.ao12)),
     currentAo5: last?.ao5,
+    ao50: best(points.map((p) => p.ao50)),
+    ao100: best(points.map((p) => p.ao100)),
     currentAo12: last?.ao12,
+    currentAo50: last?.ao50,
+    currentAo100: last?.ao100,
     count: points.length,
     dnf: points.filter((p) => p.single === null).length,
   }
