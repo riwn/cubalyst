@@ -2111,3 +2111,37 @@ button.danger-solid {
 .legend-toggle[aria-pressed='false'] {
   opacity: 0.4;
 }
+
+/* ソルブの詳細のステップの表。狭い画面では、解法を数字の行の下に回して、表が画面からはみ出さないようにする */
+.splits-alg-row {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .splits-table--steps th,
+  .splits-table--steps td {
+    padding: 4px 3px;
+  }
+
+  .splits-table--steps td {
+    font-size: 0.9rem;
+  }
+
+  .splits-table--steps .splits-alg-side {
+    display: none;
+  }
+
+  .splits-table--steps .splits-alg-row {
+    display: table-row;
+  }
+
+  .splits-table--steps .splits-numbers > * {
+    border-bottom: none;
+  }
+
+  .splits-table--steps .splits-alg-row td {
+    padding: 0 3px 8px;
+    text-align: left;
+    white-space: normal;
+  }
+}
